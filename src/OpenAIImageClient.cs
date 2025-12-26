@@ -49,6 +49,12 @@ public class OpenAIImageClient : IImageGenerationClient
             ["size"] = MapSize(request.AspectRatio, request.Resolution)
         };
 
+        // Add quality if provided
+        if (!string.IsNullOrEmpty(request.Quality))
+        {
+            body["quality"] = request.Quality;
+        }
+
         var response = await _http.PostAsJsonAsync(url, body, ct);
         var content = await response.Content.ReadAsStringAsync(ct);
 
@@ -69,6 +75,12 @@ public class OpenAIImageClient : IImageGenerationClient
         form.Add(new StringContent(request.Prompt), "prompt");
         form.Add(new StringContent(request.NumberOfImages.ToString()), "n");
         form.Add(new StringContent(MapSize(request.AspectRatio, request.Resolution)), "size");
+
+        // Add quality if provided
+        if (!string.IsNullOrEmpty(request.Quality))
+        {
+            form.Add(new StringContent(request.Quality), "quality");
+        }
 
         // Add reference images
         foreach (var imagePath in request.ReferenceImages)

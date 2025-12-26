@@ -107,16 +107,30 @@ public class PoeImageClient : IImageGenerationClient
             });
         }
 
+        // Build extra_body with only provided options
+        var extraBody = new Dictionary<string, object>
+        {
+            ["aspect"] = request.AspectRatio
+        };
+
+        // Add quality if provided
+        if (!string.IsNullOrEmpty(request.Quality))
+        {
+            extraBody["quality"] = request.Quality;
+        }
+
+        // Add resolution if not default (some Poe models support it)
+        if (request.Resolution != "1K")
+        {
+            extraBody["resolution"] = request.Resolution;
+        }
+
         var body = new Dictionary<string, object>
         {
             ["model"] = _model,
             ["messages"] = messages,
             ["stream"] = false,
-            ["extra_body"] = new Dictionary<string, object>
-            {
-                ["aspect"] = request.AspectRatio,
-                ["quality"] = MapResolutionToQuality(request.Resolution)
-            }
+            ["extra_body"] = extraBody
         };
 
         var response = await _http.PostAsJsonAsync(BaseUrl, body, JsonOptions, ct);
@@ -173,17 +187,6 @@ public class PoeImageClient : IImageGenerationClient
         {
             MimeType = mimeType,
             Data = imageBytes
-        };
-    }
-
-    private static string MapResolutionToQuality(string resolution)
-    {
-        // Poe uses "low", "medium", "high" quality settings
-        return resolution.ToUpperInvariant() switch
-        {
-            "4K" => "high",
-            "2K" => "high",
-            _ => "high" // Default to high quality
         };
     }
 

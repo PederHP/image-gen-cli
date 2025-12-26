@@ -47,7 +47,8 @@ Parameters validated at runtime - using unsupported options with a provider caus
 |-----------|--------|--------|-----|-----|
 | `--system-prompt` | Supported | Error | Error | Error |
 | `--temperature` | Supported (0.0-2.0) | Error | Error | Error |
-| `--resolution` | Pro models only | Error | Supported | Error |
+| `--resolution` | Pro models only | Error | Supported | Model-dependent |
+| `--quality` | Error | Supported | Error | Supported |
 | `--samples` max | 4 | 10 | 10 | 10 |
 | `--images` max | N/A | N/A | 8 | N/A |
 

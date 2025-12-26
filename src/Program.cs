@@ -26,7 +26,11 @@ var aspectRatioOption = new Option<string>(
 var resolutionOption = new Option<string>(
     ["--resolution", "-r"],
     () => "1K",
-    "Output resolution: 1K, 2K, 4K (Gemini Pro only)");
+    "Output resolution: 1K, 2K, 4K (Gemini Pro, BFL, some Poe models)");
+
+var qualityOption = new Option<string?>(
+    ["--quality", "-q"],
+    "Quality level: low, medium, high (OpenAI, Poe)");
 
 var temperatureOption = new Option<float>(
     ["--temperature", "-t"],
@@ -63,6 +67,7 @@ var rootCommand = new RootCommand("Generate images using Gemini, OpenAI, BFL (FL
     imagesOption,
     aspectRatioOption,
     resolutionOption,
+    qualityOption,
     temperatureOption,
     modelOption,
     samplesOption,
@@ -82,6 +87,7 @@ rootCommand.SetHandler(async (context) =>
     var images = context.ParseResult.GetValueForOption(imagesOption) ?? [];
     var aspectRatio = context.ParseResult.GetValueForOption(aspectRatioOption)!;
     var resolution = context.ParseResult.GetValueForOption(resolutionOption)!;
+    var quality = context.ParseResult.GetValueForOption(qualityOption);
     var temperature = context.ParseResult.GetValueForOption(temperatureOption);
     var modelOverride = context.ParseResult.GetValueForOption(modelOption);
     var samples = context.ParseResult.GetValueForOption(samplesOption);
@@ -153,6 +159,19 @@ rootCommand.SetHandler(async (context) =>
         return;
     }
 
+    // Validate quality if provided
+    if (!string.IsNullOrEmpty(quality))
+    {
+        var validQualities = new[] { "low", "medium", "high" };
+        if (!validQualities.Contains(quality.ToLowerInvariant()))
+        {
+            Console.Error.WriteLine($"Error: Invalid quality '{quality}'. Valid: {string.Join(", ", validQualities)}");
+            context.ExitCode = 1;
+            return;
+        }
+        quality = quality.ToLowerInvariant();
+    }
+
     var maxSamples = provider switch
     {
         "openai" => 10,
@@ -168,11 +187,21 @@ rootCommand.SetHandler(async (context) =>
     }
 
     // Validate provider-specific parameter compatibility
+    if (provider == "gemini")
+    {
+        if (!string.IsNullOrEmpty(quality))
+        {
+            Console.Error.WriteLine("Error: --quality is not supported by Gemini. Use --resolution instead.");
+            context.ExitCode = 1;
+            return;
+        }
+    }
+
     if (provider == "openai")
     {
         if (resolution != "1K")
         {
-            Console.Error.WriteLine("Error: --resolution is not supported by OpenAI. Remove this option (OpenAI uses fixed sizes based on aspect ratio).");
+            Console.Error.WriteLine("Error: --resolution is not supported by OpenAI. Use --quality instead.");
             context.ExitCode = 1;
             return;
         }
@@ -204,6 +233,12 @@ rootCommand.SetHandler(async (context) =>
             context.ExitCode = 1;
             return;
         }
+        if (!string.IsNullOrEmpty(quality))
+        {
+            Console.Error.WriteLine("Error: --quality is not supported by BFL. Use --resolution instead.");
+            context.ExitCode = 1;
+            return;
+        }
         if (images.Length > 8)
         {
             Console.Error.WriteLine("Error: BFL supports a maximum of 8 reference images.");
@@ -226,12 +261,7 @@ rootCommand.SetHandler(async (context) =>
             context.ExitCode = 1;
             return;
         }
-        if (resolution != "1K")
-        {
-            Console.Error.WriteLine("Error: --resolution is not supported by Poe. Use quality parameter in model selection.");
-            context.ExitCode = 1;
-            return;
-        }
+        // Note: resolution passed through to API - some models may support it
     }
 
     // Validate reference images exist
@@ -268,6 +298,7 @@ rootCommand.SetHandler(async (context) =>
             ReferenceImages = images.Select(f => f.FullName).ToArray(),
             AspectRatio = aspectRatio,
             Resolution = resolution.ToUpperInvariant(),
+            Quality = quality,
             Temperature = temperature,
             NumberOfImages = samples
         });

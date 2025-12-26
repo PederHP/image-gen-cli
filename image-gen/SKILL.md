@@ -189,7 +189,8 @@ image-gen <prompt> [options]
 | `--model` | `-m` | auto | Model name (use `--list-models` to see options) |
 | `--images` | `-i` | none | Reference image paths for editing (can specify multiple) |
 | `--aspect-ratio` | `-a` | `1:1` | Output aspect ratio |
-| `--resolution` | `-r` | `1K` | Resolution: `1K`, `2K`, `4K` (Gemini Pro, BFL only) |
+| `--resolution` | `-r` | `1K` | Resolution: `1K`, `2K`, `4K` (Gemini Pro, BFL, some Poe) |
+| `--quality` | `-q` | none | Quality: `low`, `medium`, `high` (OpenAI, Poe) |
 | `--temperature` | `-t` | `1.0` | Generation temperature 0.0-2.0 (Gemini only) |
 | `--samples` | `-n` | `1` | Number of images (1-4 Gemini, 1-10 others) |
 | `--output` | `-o` | current dir | Output directory for generated images |
@@ -225,7 +226,8 @@ Popular: `GPT-Image-1`, `FLUX-2-Pro`, `Imagen-4`, `Seedream-4.0` (case-sensitive
 |---------|--------|--------|-----|-----|
 | System prompt | Supported | Error | Error | Error |
 | Temperature | Supported (0.0-2.0) | Error | Error | Error |
-| Resolution | Pro models only | Error | Supported | Error |
+| Resolution | Pro models only | Error | Supported | Model-dependent |
+| Quality | Error | Supported | Error | Supported |
 | Max samples | 4 | 10 | 10 | 10 |
 | Reference images | Supported | Supported | Up to 8 | Supported |
 

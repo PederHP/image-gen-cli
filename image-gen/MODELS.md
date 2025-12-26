@@ -23,6 +23,7 @@ This reference provides detailed information about available models across all p
 | `gpt-image-1` | No | Previous generation model. Still very capable. |
 
 **OpenAI-specific features:**
+- `--quality`: Supported (low, medium, high)
 - Fixed resolution based on aspect ratio
 - Max samples: 10
 - Reference images use the edits endpoint
@@ -82,9 +83,10 @@ Poe provides unified access to many image models through a single API and subscr
 | `Qwen-Image` | Alibaba's model. Strong text rendering and complex compositions. |
 
 **Poe-specific notes:**
+- `--quality`: Supported (low, medium, high) - passed to underlying models
+- `--resolution`: Model-dependent - passed through, API returns error if unsupported
 - Model availability may change. Check poe.com for current list.
-- All models support the same parameters (aspect ratio, reference images)
-- Poe normalizes the interface across different underlying providers
+- All models support aspect ratio and reference images
 - Max samples: 10
 
 ## Model Selection Guide
