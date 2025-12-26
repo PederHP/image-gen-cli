@@ -28,7 +28,7 @@ class Program
         var resolutionOption = new Option<string>(
             ["--resolution", "-r"],
             () => "1K",
-            "Output resolution: 1K, 2K, 4K (2K/4K require Pro model)");
+            "Output resolution: 1K, 2K, 4K (2K/4K require Nano Banana Pro)");
 
         var temperatureOption = new Option<float>(
             ["--temperature", "-t"],
@@ -37,8 +37,8 @@ class Program
 
         var modelOption = new Option<string>(
             ["--model", "-m"],
-            () => "gemini-2.0-flash-preview-image-generation",
-            "Model: gemini-2.0-flash-preview-image-generation or gemini-2.0-pro-preview-image-generation");
+            () => "gemini-2.5-flash-image",
+            "Model: gemini-2.5-flash-image (Nano Banana) or gemini-3-pro-image-preview (Nano Banana Pro)");
 
         var samplesOption = new Option<int>(
             ["--samples", "-n"],
@@ -54,7 +54,7 @@ class Program
             ["--api-key", "-k"],
             "Gemini API key (or set GEMINI_API_KEY env var)");
 
-        var rootCommand = new RootCommand("Generate images using Gemini's native image generation models")
+        var rootCommand = new RootCommand("Generate images using Google's Gemini image models (Nano Banana / Nano Banana Pro)")
         {
             promptArg,
             systemPromptOption,
@@ -242,6 +242,17 @@ public class GeminiImageClient
             });
         }
 
+        var imageConfig = new Dictionary<string, object>
+        {
+            ["aspectRatio"] = request.AspectRatio
+        };
+
+        // imageSize is only supported by gemini-3-pro-image-preview
+        if (request.Model.Contains("pro", StringComparison.OrdinalIgnoreCase))
+        {
+            imageConfig["imageSize"] = request.Resolution;
+        }
+
         var body = new Dictionary<string, object>
         {
             ["contents"] = new[] { new { parts } },
@@ -249,12 +260,7 @@ public class GeminiImageClient
             {
                 ["responseModalities"] = new[] { "TEXT", "IMAGE" },
                 ["temperature"] = request.Temperature,
-                ["candidateCount"] = request.NumberOfImages,
-                ["imageConfig"] = new Dictionary<string, object>
-                {
-                    ["aspectRatio"] = request.AspectRatio,
-                    ["imageSize"] = request.Resolution
-                }
+                ["imageConfig"] = imageConfig
             }
         };
 
@@ -340,7 +346,7 @@ public class GenerationRequest
     public string AspectRatio { get; init; } = "1:1";
     public string Resolution { get; init; } = "1K";
     public float Temperature { get; init; } = 1.0f;
-    public string Model { get; init; } = "gemini-2.0-flash-preview-image-generation";
+    public string Model { get; init; } = "gemini-2.5-flash-image";
     public int NumberOfImages { get; init; } = 1;
 }
 
