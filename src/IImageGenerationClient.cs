@@ -1,6 +1,6 @@
-using GeminiImageGen.Models;
+using ImageGenCli.Models;
 
-namespace GeminiImageGen;
+namespace ImageGenCli;
 
 public interface IImageGenerationClient
 {

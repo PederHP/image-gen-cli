@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using GeminiImageGen.Models;
+using ImageGenCli.Models;
 
-namespace GeminiImageGen;
+namespace ImageGenCli;
 
 public class GeminiImageClient : IImageGenerationClient
 {

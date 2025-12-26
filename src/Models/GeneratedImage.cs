@@ -1,4 +1,4 @@
-namespace GeminiImageGen.Models;
+namespace ImageGenCli.Models;
 
 public class GeneratedImage
 {

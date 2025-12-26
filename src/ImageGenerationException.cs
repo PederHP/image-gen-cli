@@ -1,4 +1,4 @@
-namespace GeminiImageGen;
+namespace ImageGenCli;
 
 public class ImageGenerationException : Exception
 {

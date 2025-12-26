@@ -1,12 +1,17 @@
 using System.CommandLine;
-using GeminiImageGen;
-using GeminiImageGen.Models;
+using ImageGenCli;
+using ImageGenCli.Models;
 
 var promptArg = new Argument<string>("prompt", "The text prompt for image generation");
 
+var providerOption = new Option<string>(
+    ["--provider", "-p"],
+    () => "gemini",
+    "Provider: gemini or openai");
+
 var systemPromptOption = new Option<string?>(
     ["--system-prompt", "-s"],
-    "Optional system instruction for the model");
+    "Optional system instruction for the model (Gemini only)");
 
 var imagesOption = new Option<FileInfo[]>(
     ["--images", "-i"],
@@ -21,22 +26,21 @@ var aspectRatioOption = new Option<string>(
 var resolutionOption = new Option<string>(
     ["--resolution", "-r"],
     () => "1K",
-    "Output resolution: 1K, 2K, 4K (2K/4K require Nano Banana Pro)");
+    "Output resolution: 1K, 2K, 4K (Gemini Pro only)");
 
 var temperatureOption = new Option<float>(
     ["--temperature", "-t"],
     () => 1.0f,
-    "Generation temperature (0.0-2.0)");
+    "Generation temperature (0.0-2.0, Gemini only)");
 
-var modelOption = new Option<string>(
+var modelOption = new Option<string?>(
     ["--model", "-m"],
-    () => "gemini-2.5-flash-image",
-    "Model: gemini-2.5-flash-image (Nano Banana) or gemini-3-pro-image-preview (Nano Banana Pro)");
+    "Model name (defaults: gemini-2.5-flash-image, gpt-image-1.5)");
 
 var samplesOption = new Option<int>(
     ["--samples", "-n"],
     () => 1,
-    "Number of images to generate (1-4)");
+    "Number of images to generate (1-4 for Gemini, 1-10 for OpenAI)");
 
 var outputOption = new Option<DirectoryInfo>(
     ["--output", "-o"],
@@ -45,11 +49,12 @@ var outputOption = new Option<DirectoryInfo>(
 
 var apiKeyOption = new Option<string?>(
     ["--api-key", "-k"],
-    "Gemini API key (or set GEMINI_API_KEY env var)");
+    "API key (or set GEMINI_API_KEY / OPENAI_API_KEY env var)");
 
-var rootCommand = new RootCommand("Generate images using Google's Gemini image models")
+var rootCommand = new RootCommand("Generate images using Gemini or OpenAI image models")
 {
     promptArg,
+    providerOption,
     systemPromptOption,
     imagesOption,
     aspectRatioOption,
@@ -64,20 +69,43 @@ var rootCommand = new RootCommand("Generate images using Google's Gemini image m
 rootCommand.SetHandler(async (context) =>
 {
     var prompt = context.ParseResult.GetValueForArgument(promptArg);
+    var provider = context.ParseResult.GetValueForOption(providerOption)!.ToLowerInvariant();
     var systemPrompt = context.ParseResult.GetValueForOption(systemPromptOption);
     var images = context.ParseResult.GetValueForOption(imagesOption) ?? [];
     var aspectRatio = context.ParseResult.GetValueForOption(aspectRatioOption)!;
     var resolution = context.ParseResult.GetValueForOption(resolutionOption)!;
     var temperature = context.ParseResult.GetValueForOption(temperatureOption);
-    var model = context.ParseResult.GetValueForOption(modelOption)!;
+    var modelOverride = context.ParseResult.GetValueForOption(modelOption);
     var samples = context.ParseResult.GetValueForOption(samplesOption);
     var output = context.ParseResult.GetValueForOption(outputOption)!;
-    var apiKey = context.ParseResult.GetValueForOption(apiKeyOption)
-                 ?? Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+    var apiKeyOverride = context.ParseResult.GetValueForOption(apiKeyOption);
+
+    // Determine API key based on provider
+    var apiKey = apiKeyOverride ?? provider switch
+    {
+        "openai" => Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
+        _ => Environment.GetEnvironmentVariable("GEMINI_API_KEY")
+    };
 
     if (string.IsNullOrEmpty(apiKey))
     {
-        Console.Error.WriteLine("Error: API key required. Use --api-key or set GEMINI_API_KEY env var.");
+        var envVar = provider == "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY";
+        Console.Error.WriteLine($"Error: API key required. Use --api-key or set {envVar} env var.");
+        context.ExitCode = 1;
+        return;
+    }
+
+    // Determine model based on provider
+    var model = modelOverride ?? provider switch
+    {
+        "openai" => "gpt-image-1.5",
+        _ => "gemini-2.5-flash-image"
+    };
+
+    // Validate provider
+    if (provider != "gemini" && provider != "openai")
+    {
+        Console.Error.WriteLine($"Error: Invalid provider '{provider}'. Valid: gemini, openai");
         context.ExitCode = 1;
         return;
     }
@@ -91,17 +119,10 @@ rootCommand.SetHandler(async (context) =>
         return;
     }
 
-    var validResolutions = new[] { "1K", "2K", "4K" };
-    if (!validResolutions.Contains(resolution.ToUpperInvariant()))
+    var maxSamples = provider == "openai" ? 10 : 4;
+    if (samples < 1 || samples > maxSamples)
     {
-        Console.Error.WriteLine($"Error: Invalid resolution '{resolution}'. Valid: {string.Join(", ", validResolutions)}");
-        context.ExitCode = 1;
-        return;
-    }
-
-    if (samples < 1 || samples > 4)
-    {
-        Console.Error.WriteLine("Error: Samples must be between 1 and 4.");
+        Console.Error.WriteLine($"Error: Samples must be between 1 and {maxSamples}.");
         context.ExitCode = 1;
         return;
     }
@@ -125,7 +146,12 @@ rootCommand.SetHandler(async (context) =>
 
     try
     {
-        IImageGenerationClient client = new GeminiImageClient(apiKey, model);
+        IImageGenerationClient client = provider switch
+        {
+            "openai" => new OpenAIImageClient(apiKey, model),
+            _ => new GeminiImageClient(apiKey, model)
+        };
+
         var result = await client.GenerateImagesAsync(new GenerationRequest
         {
             Prompt = prompt,
@@ -148,6 +174,7 @@ rootCommand.SetHandler(async (context) =>
             return;
         }
 
+        var prefix = provider == "openai" ? "openai" : "gemini";
         var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         for (int i = 0; i < result.Images.Length; i++)
         {
@@ -160,8 +187,8 @@ rootCommand.SetHandler(async (context) =>
                 _ => "png"
             };
             var filename = result.Images.Length == 1
-                ? $"gemini-{timestamp}.{ext}"
-                : $"gemini-{timestamp}-{i + 1}.{ext}";
+                ? $"{prefix}-{timestamp}.{ext}"
+                : $"{prefix}-{timestamp}-{i + 1}.{ext}";
             var path = Path.Combine(output.FullName, filename);
 
             await File.WriteAllBytesAsync(path, img.Data);
