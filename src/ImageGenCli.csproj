@@ -6,10 +6,24 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>ImageGenCli</RootNamespace>
+
+    <!-- Dotnet Tool Configuration -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>image-gen</ToolCommandName>
+    <PackageId>ImageGenCli</PackageId>
+    <Version>1.0.0</Version>
+    <Description>Multi-provider image generation CLI supporting Gemini and OpenAI</Description>
+    <Authors>image-gen-cli contributors</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="/" Condition="Exists('../README.md')" />
   </ItemGroup>
 
 </Project>

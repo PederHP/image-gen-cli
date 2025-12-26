@@ -1,48 +1,85 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Instructions for AI agents working with this codebase.
 
-## Build & Run Commands
+## Quick Start
 
 ```bash
-# Build
-dotnet build src/ImageGenCli.csproj
+# If image-gen is installed globally
+image-gen "Your prompt here"
 
-# Run (defaults to Gemini provider)
+# If working from source
 dotnet run --project src/ImageGenCli.csproj -- "Your prompt here"
-
-# Run with OpenAI provider
-dotnet run --project src/ImageGenCli.csproj -- -p openai "Your prompt here"
-
-# Run with reference image
-dotnet run --project src/ImageGenCli.csproj -- "Edit this image" -i /path/to/image.png
 ```
+
+## Installation
+
+```bash
+# From source
+dotnet pack src/ImageGenCli.csproj -c Release -o ./nupkg
+dotnet tool install --global --add-source ./nupkg ImageGenCli
+```
+
+## Usage Examples
+
+```bash
+# Basic generation (Gemini default)
+image-gen "A sunset over mountains"
+
+# OpenAI provider
+image-gen -p openai "A futuristic cityscape"
+
+# With aspect ratio
+image-gen -a 16:9 "Desktop wallpaper, abstract art"
+
+# Multiple images
+image-gen -n 4 "Logo concepts for a coffee shop"
+
+# Edit existing image
+image-gen -i photo.jpg "Remove the background"
+
+# Specify output directory
+image-gen -o ./output "Product photo mockup"
+```
+
+## Provider Constraints
+
+**When using OpenAI (`-p openai`), do NOT use:**
+- `--resolution` / `-r` (causes error)
+- `--system-prompt` / `-s` (causes error)
+- `--temperature` / `-t` with non-default value (causes error)
+
+These parameters are Gemini-only. The CLI will return a non-zero exit code with an error message if you use them with OpenAI.
 
 ## Architecture
 
-Multi-provider image generation CLI using .NET 8 and System.CommandLine.
+**Provider Pattern** - all providers implement `IImageGenerationClient`:
+```csharp
+Task<GenerationResult> GenerateImagesAsync(GenerationRequest request, CancellationToken ct)
+```
 
-**Provider Pattern:**
-- `IImageGenerationClient` - common interface for all providers
-- `GeminiImageClient` - Google Gemini API (gemini-2.5-flash-image, gemini-3-pro-image-preview)
-- `OpenAIImageClient` - OpenAI API (gpt-image-1.5, gpt-image-1)
+**Key files:**
+- `src/Program.cs` - CLI parsing, provider instantiation, validation
+- `src/IImageGenerationClient.cs` - Provider interface
+- `src/GeminiImageClient.cs` - Google Gemini API
+- `src/OpenAIImageClient.cs` - OpenAI API
+- `src/Models/` - Provider-agnostic request/response types
 
-**Models (in `Models/`):**
-- `GenerationRequest` - provider-agnostic input (prompt, reference images, aspect ratio, etc.)
-- `GenerationResult` - output with images array and optional text response
-- `GeneratedImage` - single image with mime type and byte data
+## Adding a New Provider
 
-**Adding a new provider:**
 1. Create `NewProviderImageClient.cs` implementing `IImageGenerationClient`
-2. Add provider option to `Program.cs` switch statements (client instantiation, API key lookup)
+2. In `Program.cs`, add to:
+   - API key resolution switch (~line 84)
+   - Default model switch (~line 99)
+   - Provider validation (~line 106)
+   - Provider-specific parameter validation (~line 131)
+   - Client instantiation switch (~line 171)
 
 ## Environment Variables
 
 - `GEMINI_API_KEY` - for Gemini provider
 - `OPENAI_API_KEY` - for OpenAI provider
 
-## Notes
+## Agent Skill
 
-- `.tmp/` directory is gitignored and can be used for test outputs
-- Gemini's `imageSize` parameter only works with Pro models; Flash models ignore it
-- OpenAI uses `/v1/images/generations` for text-only, `/v1/images/edits` for reference images
+See `image-gen/SKILL.md` for the [Agent Skills](https://agentskills.io) definition with complete parameter documentation.

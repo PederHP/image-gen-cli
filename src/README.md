@@ -36,7 +36,7 @@ gemini-imagegen "A forest scene" \
 
 # Using Pro model for higher resolution
 gemini-imagegen "Detailed cityscape" \
-  --model gemini-2.0-pro-preview-image-generation \
+  --model gemini-3-pro-image-preview \
   --resolution 4K
 ```
 
@@ -49,15 +49,15 @@ gemini-imagegen "Detailed cityscape" \
 | `--aspect-ratio` | `-a` | `1:1` | 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9 |
 | `--resolution` | `-r` | `1K` | 1K, 2K, 4K (2K/4K need Pro model) |
 | `--temperature` | `-t` | `1.0` | 0.0-2.0 |
-| `--model` | `-m` | `gemini-2.0-flash-preview-image-generation` | Model identifier |
+| `--model` | `-m` | `gemini-2.5-flash-image` | Model identifier |
 | `--samples` | `-n` | `1` | Number of images (1-4) |
 | `--output` | `-o` | `.` | Output directory |
 | `--api-key` | `-k` | env | API key (or GEMINI_API_KEY) |
 
 ## Models
 
-- **Flash** (`gemini-2.0-flash-preview-image-generation`): Fast, 1K output
-- **Pro** (`gemini-2.0-pro-preview-image-generation`): 1K/2K/4K, up to 14 reference images
+- **Flash** (`gemini-2.0-flash`): Fast, 1K output
+- **Pro** (`gemini-3-pro-image-preview`): 1K/2K/4K, up to 14 reference images
 
 > **Note**: Model names may change as Google updates their API. Check the [Gemini API docs](https://ai.google.dev/gemini-api/docs/image-generation) for current model identifiers.
 
