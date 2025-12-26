@@ -7,7 +7,7 @@ var promptArg = new Argument<string>("prompt", "The text prompt for image genera
 var providerOption = new Option<string>(
     ["--provider", "-p"],
     () => "gemini",
-    "Provider: gemini or openai");
+    "Provider: gemini, openai, or bfl");
 
 var systemPromptOption = new Option<string?>(
     ["--system-prompt", "-s"],
@@ -35,7 +35,7 @@ var temperatureOption = new Option<float>(
 
 var modelOption = new Option<string?>(
     ["--model", "-m"],
-    "Model name (defaults: gemini-2.5-flash-image, gpt-image-1.5)");
+    "Model name (defaults: gemini-2.5-flash-image, gpt-image-1.5, flux-2-pro)");
 
 var samplesOption = new Option<int>(
     ["--samples", "-n"],
@@ -49,9 +49,9 @@ var outputOption = new Option<DirectoryInfo>(
 
 var apiKeyOption = new Option<string?>(
     ["--api-key", "-k"],
-    "API key (or set GEMINI_API_KEY / OPENAI_API_KEY env var)");
+    "API key (or set GEMINI_API_KEY / OPENAI_API_KEY / BFL_API_KEY env var)");
 
-var rootCommand = new RootCommand("Generate images using Gemini or OpenAI image models")
+var rootCommand = new RootCommand("Generate images using Gemini, OpenAI, or BFL (FLUX) image models")
 {
     promptArg,
     providerOption,
@@ -84,12 +84,18 @@ rootCommand.SetHandler(async (context) =>
     var apiKey = apiKeyOverride ?? provider switch
     {
         "openai" => Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
+        "bfl" => Environment.GetEnvironmentVariable("BFL_API_KEY"),
         _ => Environment.GetEnvironmentVariable("GEMINI_API_KEY")
     };
 
     if (string.IsNullOrEmpty(apiKey))
     {
-        var envVar = provider == "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY";
+        var envVar = provider switch
+        {
+            "openai" => "OPENAI_API_KEY",
+            "bfl" => "BFL_API_KEY",
+            _ => "GEMINI_API_KEY"
+        };
         Console.Error.WriteLine($"Error: API key required. Use --api-key or set {envVar} env var.");
         context.ExitCode = 1;
         return;
@@ -99,13 +105,14 @@ rootCommand.SetHandler(async (context) =>
     var model = modelOverride ?? provider switch
     {
         "openai" => "gpt-image-1.5",
+        "bfl" => "flux-2-pro",
         _ => "gemini-2.5-flash-image"
     };
 
     // Validate provider
-    if (provider != "gemini" && provider != "openai")
+    if (provider != "gemini" && provider != "openai" && provider != "bfl")
     {
-        Console.Error.WriteLine($"Error: Invalid provider '{provider}'. Valid: gemini, openai");
+        Console.Error.WriteLine($"Error: Invalid provider '{provider}'. Valid: gemini, openai, bfl");
         context.ExitCode = 1;
         return;
     }
@@ -119,7 +126,12 @@ rootCommand.SetHandler(async (context) =>
         return;
     }
 
-    var maxSamples = provider == "openai" ? 10 : 4;
+    var maxSamples = provider switch
+    {
+        "openai" => 10,
+        "bfl" => 10,
+        _ => 4 // Gemini
+    };
     if (samples < 1 || samples > maxSamples)
     {
         Console.Error.WriteLine($"Error: Samples must be between 1 and {maxSamples}.");
@@ -150,6 +162,28 @@ rootCommand.SetHandler(async (context) =>
         }
     }
 
+    if (provider == "bfl")
+    {
+        if (!string.IsNullOrEmpty(systemPrompt))
+        {
+            Console.Error.WriteLine("Error: --system-prompt is not supported by BFL.");
+            context.ExitCode = 1;
+            return;
+        }
+        if (temperature != 1.0f)
+        {
+            Console.Error.WriteLine("Error: --temperature is not supported by BFL.");
+            context.ExitCode = 1;
+            return;
+        }
+        if (images.Length > 8)
+        {
+            Console.Error.WriteLine("Error: BFL supports a maximum of 8 reference images.");
+            context.ExitCode = 1;
+            return;
+        }
+    }
+
     // Validate reference images exist
     foreach (var image in images)
     {
@@ -172,6 +206,7 @@ rootCommand.SetHandler(async (context) =>
         IImageGenerationClient client = provider switch
         {
             "openai" => new OpenAIImageClient(apiKey, model),
+            "bfl" => new BflImageClient(apiKey, model),
             _ => new GeminiImageClient(apiKey, model)
         };
 
@@ -197,7 +232,12 @@ rootCommand.SetHandler(async (context) =>
             return;
         }
 
-        var prefix = provider == "openai" ? "openai" : "gemini";
+        var prefix = provider switch
+        {
+            "openai" => "openai",
+            "bfl" => "flux",
+            _ => "gemini"
+        };
         var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
         for (int i = 0; i < result.Images.Length; i++)
         {

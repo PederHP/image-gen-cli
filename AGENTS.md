@@ -1,85 +1,74 @@
-# AGENTS.md
+# CLAUDE.md
 
-Instructions for AI agents working with this codebase.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Quick Start
 
 ```bash
-# If image-gen is installed globally
-image-gen "Your prompt here"
+# Build
+dotnet build src/ImageGenCli.csproj
 
-# If working from source
+# Run directly (development)
 dotnet run --project src/ImageGenCli.csproj -- "Your prompt here"
-```
 
-## Installation
-
-```bash
-# From source
+# Install as global tool (recommended)
 dotnet pack src/ImageGenCli.csproj -c Release -o ./nupkg
 dotnet tool install --global --add-source ./nupkg ImageGenCli
+
+# Then use anywhere
+image-gen "Your prompt here"
 ```
-
-## Usage Examples
-
-```bash
-# Basic generation (Gemini default)
-image-gen "A sunset over mountains"
-
-# OpenAI provider
-image-gen -p openai "A futuristic cityscape"
-
-# With aspect ratio
-image-gen -a 16:9 "Desktop wallpaper, abstract art"
-
-# Multiple images
-image-gen -n 4 "Logo concepts for a coffee shop"
-
-# Edit existing image
-image-gen -i photo.jpg "Remove the background"
-
-# Specify output directory
-image-gen -o ./output "Product photo mockup"
-```
-
-## Provider Constraints
-
-**When using OpenAI (`-p openai`), do NOT use:**
-- `--resolution` / `-r` (causes error)
-- `--system-prompt` / `-s` (causes error)
-- `--temperature` / `-t` with non-default value (causes error)
-
-These parameters are Gemini-only. The CLI will return a non-zero exit code with an error message if you use them with OpenAI.
 
 ## Architecture
 
-**Provider Pattern** - all providers implement `IImageGenerationClient`:
-```csharp
-Task<GenerationResult> GenerateImagesAsync(GenerationRequest request, CancellationToken ct)
-```
+Multi-provider image generation CLI using .NET 8 and System.CommandLine.
 
-**Key files:**
-- `src/Program.cs` - CLI parsing, provider instantiation, validation
-- `src/IImageGenerationClient.cs` - Provider interface
-- `src/GeminiImageClient.cs` - Google Gemini API
-- `src/OpenAIImageClient.cs` - OpenAI API
-- `src/Models/` - Provider-agnostic request/response types
+**Provider Pattern:**
+- `IImageGenerationClient` - common interface for all providers
+- `GeminiImageClient` - Google Gemini API (gemini-2.5-flash-image, gemini-3-pro-image-preview)
+- `OpenAIImageClient` - OpenAI API (gpt-image-1.5, gpt-image-1)
+- `BflImageClient` - Black Forest Labs FLUX API (flux-2-pro, flux-2-flex, flux-2-max)
 
-## Adding a New Provider
+**Models (in `Models/`):**
+- `GenerationRequest` - provider-agnostic input (prompt, reference images, aspect ratio, etc.)
+- `GenerationResult` - output with images array and optional text response
+- `GeneratedImage` - single image with mime type and byte data
 
+**Adding a new provider:**
 1. Create `NewProviderImageClient.cs` implementing `IImageGenerationClient`
-2. In `Program.cs`, add to:
-   - API key resolution switch (~line 84)
-   - Default model switch (~line 99)
-   - Provider validation (~line 106)
-   - Provider-specific parameter validation (~line 131)
-   - Client instantiation switch (~line 171)
+2. Add provider option to `Program.cs` switch statements (client instantiation, API key lookup, validation)
+
+## Provider-Specific Constraints
+
+Parameters validated at runtime - using unsupported options with a provider causes a hard error:
+
+| Parameter | Gemini | OpenAI | BFL |
+|-----------|--------|--------|-----|
+| `--system-prompt` | Supported | Error | Error |
+| `--temperature` | Supported (0.0-2.0) | Error (if not default 1.0) | Error (if not default 1.0) |
+| `--resolution` | Pro models only | Error (if not default 1K) | Supported (1K, 2K, 4K) |
+| `--samples` max | 4 | 10 | 10 |
+| `--images` max | N/A | N/A | 8 |
+
+**BFL Model Comparison:**
+- `flux-2-pro` (default) - Fast (~10s), production-ready, $0.03/MP
+- `flux-2-flex` - Adjustable controls (steps, guidance), best typography, $0.06/MP
+- `flux-2-max` - Highest quality, web grounding, $0.07/MP
 
 ## Environment Variables
 
 - `GEMINI_API_KEY` - for Gemini provider
 - `OPENAI_API_KEY` - for OpenAI provider
+- `BFL_API_KEY` - for BFL (FLUX) provider
 
 ## Agent Skill
 
-See `image-gen/SKILL.md` for the [Agent Skills](https://agentskills.io) definition with complete parameter documentation.
+This project includes an [Agent Skill](https://agentskills.io) definition in `image-gen/SKILL.md` for AI agent integration. The skill provides structured instructions for agents to use the CLI effectively.
+
+## Notes
+
+- `.tmp/` directory is gitignored and can be used for test outputs
+- Gemini's `imageSize` parameter only works with Pro models; Flash models ignore it
+- OpenAI maps aspect ratios to fixed pixel dimensions (no resolution control)
+- BFL uses async API with polling; dimensions must be multiples of 16
+- BFL doesn't support batch generation; multiple samples are generated sequentially
