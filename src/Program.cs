@@ -7,7 +7,7 @@ var promptArg = new Argument<string>("prompt", "The text prompt for image genera
 var providerOption = new Option<string>(
     ["--provider", "-p"],
     () => "gemini",
-    "Provider: gemini, openai, or bfl");
+    "Provider: gemini, openai, bfl, or poe");
 
 var systemPromptOption = new Option<string?>(
     ["--system-prompt", "-s"],
@@ -35,7 +35,7 @@ var temperatureOption = new Option<float>(
 
 var modelOption = new Option<string?>(
     ["--model", "-m"],
-    "Model name (defaults: gemini-2.5-flash-image, gpt-image-1.5, flux-2-pro)");
+    "Model name (use --list-models to see available models per provider)");
 
 var samplesOption = new Option<int>(
     ["--samples", "-n"],
@@ -49,9 +49,13 @@ var outputOption = new Option<DirectoryInfo>(
 
 var apiKeyOption = new Option<string?>(
     ["--api-key", "-k"],
-    "API key (or set GEMINI_API_KEY / OPENAI_API_KEY / BFL_API_KEY env var)");
+    "API key (or set GEMINI_API_KEY / OPENAI_API_KEY / BFL_API_KEY / POE_API_KEY env var)");
 
-var rootCommand = new RootCommand("Generate images using Gemini, OpenAI, or BFL (FLUX) image models")
+var listModelsOption = new Option<bool>(
+    ["--list-models", "-l"],
+    "List available models for the specified provider");
+
+var rootCommand = new RootCommand("Generate images using Gemini, OpenAI, BFL (FLUX), or Poe image models")
 {
     promptArg,
     providerOption,
@@ -63,8 +67,12 @@ var rootCommand = new RootCommand("Generate images using Gemini, OpenAI, or BFL 
     modelOption,
     samplesOption,
     outputOption,
-    apiKeyOption
+    apiKeyOption,
+    listModelsOption
 };
+
+// Make prompt optional when --list-models is used
+promptArg.SetDefaultValue("");
 
 rootCommand.SetHandler(async (context) =>
 {
@@ -79,12 +87,29 @@ rootCommand.SetHandler(async (context) =>
     var samples = context.ParseResult.GetValueForOption(samplesOption);
     var output = context.ParseResult.GetValueForOption(outputOption)!;
     var apiKeyOverride = context.ParseResult.GetValueForOption(apiKeyOption);
+    var listModels = context.ParseResult.GetValueForOption(listModelsOption);
+
+    // Handle --list-models
+    if (listModels)
+    {
+        PrintModelsForProvider(provider);
+        return;
+    }
+
+    // Validate prompt is provided when not listing models
+    if (string.IsNullOrEmpty(prompt))
+    {
+        Console.Error.WriteLine("Error: Prompt is required. Use --help for usage information.");
+        context.ExitCode = 1;
+        return;
+    }
 
     // Determine API key based on provider
     var apiKey = apiKeyOverride ?? provider switch
     {
         "openai" => Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
         "bfl" => Environment.GetEnvironmentVariable("BFL_API_KEY"),
+        "poe" => Environment.GetEnvironmentVariable("POE_API_KEY"),
         _ => Environment.GetEnvironmentVariable("GEMINI_API_KEY")
     };
 
@@ -94,6 +119,7 @@ rootCommand.SetHandler(async (context) =>
         {
             "openai" => "OPENAI_API_KEY",
             "bfl" => "BFL_API_KEY",
+            "poe" => "POE_API_KEY",
             _ => "GEMINI_API_KEY"
         };
         Console.Error.WriteLine($"Error: API key required. Use --api-key or set {envVar} env var.");
@@ -106,13 +132,14 @@ rootCommand.SetHandler(async (context) =>
     {
         "openai" => "gpt-image-1.5",
         "bfl" => "flux-2-pro",
+        "poe" => "GPT-Image-1",
         _ => "gemini-2.5-flash-image"
     };
 
     // Validate provider
-    if (provider != "gemini" && provider != "openai" && provider != "bfl")
+    if (provider != "gemini" && provider != "openai" && provider != "bfl" && provider != "poe")
     {
-        Console.Error.WriteLine($"Error: Invalid provider '{provider}'. Valid: gemini, openai, bfl");
+        Console.Error.WriteLine($"Error: Invalid provider '{provider}'. Valid: gemini, openai, bfl, poe");
         context.ExitCode = 1;
         return;
     }
@@ -130,6 +157,7 @@ rootCommand.SetHandler(async (context) =>
     {
         "openai" => 10,
         "bfl" => 10,
+        "poe" => 10,
         _ => 4 // Gemini
     };
     if (samples < 1 || samples > maxSamples)
@@ -184,6 +212,28 @@ rootCommand.SetHandler(async (context) =>
         }
     }
 
+    if (provider == "poe")
+    {
+        if (!string.IsNullOrEmpty(systemPrompt))
+        {
+            Console.Error.WriteLine("Error: --system-prompt is not supported by Poe.");
+            context.ExitCode = 1;
+            return;
+        }
+        if (temperature != 1.0f)
+        {
+            Console.Error.WriteLine("Error: --temperature is not supported by Poe.");
+            context.ExitCode = 1;
+            return;
+        }
+        if (resolution != "1K")
+        {
+            Console.Error.WriteLine("Error: --resolution is not supported by Poe. Use quality parameter in model selection.");
+            context.ExitCode = 1;
+            return;
+        }
+    }
+
     // Validate reference images exist
     foreach (var image in images)
     {
@@ -207,6 +257,7 @@ rootCommand.SetHandler(async (context) =>
         {
             "openai" => new OpenAIImageClient(apiKey, model),
             "bfl" => new BflImageClient(apiKey, model),
+            "poe" => new PoeImageClient(apiKey, model),
             _ => new GeminiImageClient(apiKey, model)
         };
 
@@ -236,6 +287,7 @@ rootCommand.SetHandler(async (context) =>
         {
             "openai" => "openai",
             "bfl" => "flux",
+            "poe" => "poe",
             _ => "gemini"
         };
         var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
@@ -276,3 +328,55 @@ rootCommand.SetHandler(async (context) =>
 });
 
 return await rootCommand.InvokeAsync(args);
+
+static void PrintModelsForProvider(string provider)
+{
+    Console.WriteLine($"Available models for {provider}:\n");
+
+    switch (provider.ToLowerInvariant())
+    {
+        case "gemini":
+            Console.WriteLine("  gemini-2.5-flash-image    (default) Fast generation, good quality");
+            Console.WriteLine("  gemini-3-pro-image-preview          Higher quality, supports --resolution");
+            break;
+
+        case "openai":
+            Console.WriteLine("  gpt-image-1.5    (default) Latest model, exceptional quality");
+            Console.WriteLine("  gpt-image-1                Previous generation model");
+            break;
+
+        case "bfl":
+            Console.WriteLine("  flux-2-pro     (default) Fast (~10s), production-ready, $0.03/MP");
+            Console.WriteLine("  flux-2-flex              Adjustable controls, best typography, $0.06/MP");
+            Console.WriteLine("  flux-2-max               Highest quality, web grounding, $0.07/MP");
+            break;
+
+        case "poe":
+            Console.WriteLine("Poe provides access to many image models via a single API.\n");
+            Console.WriteLine("Popular models:");
+            Console.WriteLine("  GPT-Image-1        (default) OpenAI's ChatGPT image model");
+            Console.WriteLine("  GPT-Image-1.5               OpenAI's latest image model");
+            Console.WriteLine("  GPT-Image-1-Mini            OpenAI's lighter image model");
+            Console.WriteLine("  FLUX-2-Pro                  Black Forest Labs FLUX.2 Pro");
+            Console.WriteLine("  FLUX-2-Flex                 Black Forest Labs FLUX.2 Flex");
+            Console.WriteLine("  FLUX-2-Dev                  Black Forest Labs FLUX.2 Dev (open-weight)");
+            Console.WriteLine("  Flux-Kontext-Pro            FLUX.1 Kontext Pro (editing focus)");
+            Console.WriteLine("  Flux-Kontext-Max            FLUX.1 Kontext Max");
+            Console.WriteLine("  FLUX-Krea                   FLUX Dev tuned for aesthetics");
+            Console.WriteLine("  Imagen-4                    Google DeepMind Imagen 4");
+            Console.WriteLine("  Imagen-4-Fast               Google DeepMind Imagen 4 (faster)");
+            Console.WriteLine("  Imagen-4-Ultra              Google DeepMind Imagen 4 (highest quality)");
+            Console.WriteLine("  Nano-Banana                 Gemini 2.5 Flash Image model");
+            Console.WriteLine("  Nano-Banana-Pro             Gemini 3 Pro Image Preview");
+            Console.WriteLine("  Seedream-4.0                ByteDance's latest model, great text rendering");
+            Console.WriteLine("  Qwen-Image                  Alibaba's model, strong text rendering");
+            Console.WriteLine("\nNote: Model availability may change. Check poe.com for current list.");
+            Console.WriteLine("Model names are case-sensitive (e.g., GPT-Image-1, not gpt-image-1).");
+            break;
+
+        default:
+            Console.Error.WriteLine($"Unknown provider: {provider}");
+            Console.Error.WriteLine("Valid providers: gemini, openai, bfl, poe");
+            break;
+    }
+}

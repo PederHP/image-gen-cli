@@ -1,13 +1,15 @@
 ---
 name: image-gen
-description: Generate and edit images using AI models (Gemini or OpenAI). Use this skill when you need to create images from text prompts, edit existing images, or generate variations. Supports multiple providers with automatic API key detection from environment variables.
+description: Generate and edit images using AI models (Gemini, OpenAI, BFL FLUX, or Poe). Use this skill when you need to create images from text prompts, edit existing images, or generate variations. Supports multiple providers with automatic API key detection from environment variables.
 license: MIT
-compatibility: Requires .NET 8.0 runtime and either GEMINI_API_KEY or OPENAI_API_KEY environment variable
+compatibility: Requires .NET 8.0 runtime and at least one of GEMINI_API_KEY, OPENAI_API_KEY, BFL_API_KEY, or POE_API_KEY environment variable
 ---
 
 # Image Generation Skill
 
-Generate images from text prompts or edit existing images using Gemini or OpenAI image models.
+Generate images from text prompts or edit existing images using Gemini, OpenAI, BFL (FLUX), or Poe image models.
+
+For detailed model information, see [MODELS.md](MODELS.md) or run `image-gen --list-models -p <provider>`.
 
 ## When to Use This Skill
 
@@ -161,9 +163,11 @@ The `image-gen` command must be installed. Install with:
 dotnet tool install --global ImageGenCli
 ```
 
-Ensure one of these environment variables is set:
+Ensure at least one of these environment variables is set:
 - `GEMINI_API_KEY` - for Gemini provider (default)
 - `OPENAI_API_KEY` - for OpenAI provider
+- `BFL_API_KEY` - for BFL (FLUX) provider
+- `POE_API_KEY` - for Poe provider (access to many models)
 
 ## Command Reference
 
@@ -181,15 +185,16 @@ image-gen <prompt> [options]
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--provider` | `-p` | `gemini` | Provider: `gemini` or `openai` |
-| `--model` | `-m` | auto | Model name (see Provider Models below) |
+| `--provider` | `-p` | `gemini` | Provider: `gemini`, `openai`, `bfl`, or `poe` |
+| `--model` | `-m` | auto | Model name (use `--list-models` to see options) |
 | `--images` | `-i` | none | Reference image paths for editing (can specify multiple) |
 | `--aspect-ratio` | `-a` | `1:1` | Output aspect ratio |
-| `--resolution` | `-r` | `1K` | Resolution: `1K`, `2K`, `4K` (Gemini Pro only) |
+| `--resolution` | `-r` | `1K` | Resolution: `1K`, `2K`, `4K` (Gemini Pro, BFL only) |
 | `--temperature` | `-t` | `1.0` | Generation temperature 0.0-2.0 (Gemini only) |
-| `--samples` | `-n` | `1` | Number of images (1-4 Gemini, 1-10 OpenAI) |
+| `--samples` | `-n` | `1` | Number of images (1-4 Gemini, 1-10 others) |
 | `--output` | `-o` | current dir | Output directory for generated images |
 | `--api-key` | `-k` | env var | Override API key |
+| `--list-models` | `-l` | - | List available models for the provider |
 
 ### Aspect Ratios
 
@@ -202,20 +207,29 @@ Supported values: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9
 - `gemini-3-pro-image-preview` - Higher quality, supports resolution parameter
 
 **OpenAI:**
-- `gpt-image-1.5` (default)
-- `gpt-image-1`
+- `gpt-image-1.5` (default) - Latest frontier model
+- `gpt-image-1` - Previous generation
+
+**BFL (FLUX):**
+- `flux-2-pro` (default) - Fast, production-ready
+- `flux-2-flex` - Adjustable controls, best typography
+- `flux-2-max` - Highest quality, web grounding
+
+**Poe:**
+Access to many models via single API. Use `--list-models -p poe` for full list.
+Popular: `GPT-Image-1`, `FLUX-2-Pro`, `Imagen-4`, `Seedream-4.0` (case-sensitive)
 
 ## Provider Differences
 
-| Feature | Gemini | OpenAI |
-|---------|--------|--------|
-| System prompt | Supported | Not supported |
-| Temperature | Supported (0.0-2.0) | Not supported |
-| Resolution | Pro models only | Fixed (based on aspect ratio) |
-| Max samples | 4 | 10 |
-| Reference images | Supported | Supported (uses edits endpoint) |
+| Feature | Gemini | OpenAI | BFL | Poe |
+|---------|--------|--------|-----|-----|
+| System prompt | Supported | Error | Error | Error |
+| Temperature | Supported (0.0-2.0) | Error | Error | Error |
+| Resolution | Pro models only | Error | Supported | Error |
+| Max samples | 4 | 10 | 10 | 10 |
+| Reference images | Supported | Supported | Up to 8 | Supported |
 
-**Important:** When using OpenAI, do not specify `--resolution`, `--system-prompt`, or `--temperature` - these will cause an error.
+**Important:** Provider-specific parameters cause errors if used with incompatible providers. Use only supported options.
 
 ## Examples
 
@@ -227,6 +241,14 @@ image-gen "A sunset over mountains with a lake reflection"
 
 # Generate with OpenAI
 image-gen -p openai "A futuristic city skyline at night"
+
+# Generate with BFL FLUX
+image-gen -p bfl "A cyberpunk street scene with neon signs"
+
+# Generate with Poe (access to many models)
+image-gen -p poe "A watercolor landscape"
+image-gen -p poe -m Imagen-4 "A photorealistic portrait"
+image-gen -p poe -m Seedream-4.0 "A poster with bold typography saying 'HELLO WORLD'"
 ```
 
 ### Aspect Ratios

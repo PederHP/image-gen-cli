@@ -28,6 +28,7 @@ Multi-provider image generation CLI using .NET 8 and System.CommandLine.
 - `GeminiImageClient` - Google Gemini API (gemini-2.5-flash-image, gemini-3-pro-image-preview)
 - `OpenAIImageClient` - OpenAI API (gpt-image-1.5, gpt-image-1)
 - `BflImageClient` - Black Forest Labs FLUX API (flux-2-pro, flux-2-flex, flux-2-max)
+- `PoeImageClient` - Poe.com API (unified access to many models)
 
 **Models (in `Models/`):**
 - `GenerationRequest` - provider-agnostic input (prompt, reference images, aspect ratio, etc.)
@@ -42,24 +43,29 @@ Multi-provider image generation CLI using .NET 8 and System.CommandLine.
 
 Parameters validated at runtime - using unsupported options with a provider causes a hard error:
 
-| Parameter | Gemini | OpenAI | BFL |
-|-----------|--------|--------|-----|
-| `--system-prompt` | Supported | Error | Error |
-| `--temperature` | Supported (0.0-2.0) | Error (if not default 1.0) | Error (if not default 1.0) |
-| `--resolution` | Pro models only | Error (if not default 1K) | Supported (1K, 2K, 4K) |
-| `--samples` max | 4 | 10 | 10 |
-| `--images` max | N/A | N/A | 8 |
+| Parameter | Gemini | OpenAI | BFL | Poe |
+|-----------|--------|--------|-----|-----|
+| `--system-prompt` | Supported | Error | Error | Error |
+| `--temperature` | Supported (0.0-2.0) | Error | Error | Error |
+| `--resolution` | Pro models only | Error | Supported | Error |
+| `--samples` max | 4 | 10 | 10 | 10 |
+| `--images` max | N/A | N/A | 8 | N/A |
 
 **BFL Model Comparison:**
 - `flux-2-pro` (default) - Fast (~10s), production-ready, $0.03/MP
 - `flux-2-flex` - Adjustable controls (steps, guidance), best typography, $0.06/MP
 - `flux-2-max` - Highest quality, web grounding, $0.07/MP
 
+**Poe Model Access:**
+Poe provides unified access to many image models (OpenAI, FLUX, Imagen, etc.) via single API.
+Use `image-gen --list-models -p poe` to see available models. Model names are case-sensitive.
+
 ## Environment Variables
 
 - `GEMINI_API_KEY` - for Gemini provider
 - `OPENAI_API_KEY` - for OpenAI provider
 - `BFL_API_KEY` - for BFL (FLUX) provider
+- `POE_API_KEY` - for Poe provider
 
 ## Agent Skill
 
@@ -72,3 +78,5 @@ This project includes an [Agent Skill](https://agentskills.io) definition in `im
 - OpenAI maps aspect ratios to fixed pixel dimensions (no resolution control)
 - BFL uses async API with polling; dimensions must be multiples of 16
 - BFL doesn't support batch generation; multiple samples are generated sequentially
+- Poe returns images as markdown URLs in response content; client parses and downloads
+- Use `--list-models -p <provider>` to see available models for each provider
