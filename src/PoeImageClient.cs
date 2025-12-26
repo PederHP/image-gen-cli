@@ -7,13 +7,18 @@ using ImageGenCli.Models;
 
 namespace ImageGenCli;
 
-public class PoeImageClient : IImageGenerationClient
+/// <summary>
+/// Image generation client for Poe API.
+/// Provides unified access to many image models (OpenAI, FLUX, Imagen, etc.).
+/// </summary>
+public partial class PoeImageClient : IImageGenerationClient
 {
-    private readonly HttpClient _http;
-    private readonly HttpClient _downloadHttp;
+    private static readonly HttpClient ApiHttp = new();
+    private static readonly HttpClient DownloadHttp = CreateDownloadHttpClient();
     private readonly string _apiKey;
     private readonly string _model;
     private const string BaseUrl = "https://api.poe.com/v1/chat/completions";
+    private const string DefaultResolution = "1K";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -22,25 +27,31 @@ public class PoeImageClient : IImageGenerationClient
     };
 
     // Regex to extract image URLs from markdown or plain text response
-    private static readonly Regex ImageUrlRegex = new(
+    [GeneratedRegex(
         @"https://[^\s\)\""\]]+\.(?:png|jpg|jpeg|webp|gif)(?:\?[^\s\)\""\]]*)?|https://pfst\.cf2\.poecdn\.net/[^\s\)\""\]]+",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    private static partial Regex ImageUrlPattern();
 
+    private static HttpClient CreateDownloadHttpClient()
+    {
+        var client = new HttpClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        client.DefaultRequestHeaders.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
+        return client;
+    }
+
+    /// <summary>
+    /// Creates a new Poe image client.
+    /// </summary>
+    /// <param name="apiKey">The Poe API key.</param>
+    /// <param name="model">The model to use (default: GPT-Image-1).</param>
     public PoeImageClient(string apiKey, string model = "GPT-Image-1")
     {
         _apiKey = apiKey;
         _model = model;
-
-        // Client for API requests (with auth)
-        _http = new HttpClient();
-        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-
-        // Separate client for downloading images (no auth, browser-like headers)
-        _downloadHttp = new HttpClient();
-        _downloadHttp.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-        _downloadHttp.DefaultRequestHeaders.Accept.ParseAdd("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8");
     }
 
+    /// <inheritdoc />
     public async Task<GenerationResult> GenerateImagesAsync(GenerationRequest request, CancellationToken ct = default)
     {
         var images = new List<GeneratedImage>();
@@ -73,7 +84,7 @@ public class PoeImageClient : IImageGenerationClient
             {
                 var bytes = await File.ReadAllBytesAsync(imagePath, ct);
                 var base64 = Convert.ToBase64String(bytes);
-                var mimeType = GetMimeType(imagePath);
+                var mimeType = MimeTypeHelper.GetMimeType(imagePath);
 
                 contentParts.Add(new
                 {
@@ -113,14 +124,13 @@ public class PoeImageClient : IImageGenerationClient
             ["aspect"] = request.AspectRatio
         };
 
-        // Add quality if provided
         if (!string.IsNullOrEmpty(request.Quality))
         {
             extraBody["quality"] = request.Quality;
         }
 
         // Add resolution if not default (some Poe models support it)
-        if (request.Resolution != "1K")
+        if (request.Resolution != DefaultResolution)
         {
             extraBody["resolution"] = request.Resolution;
         }
@@ -133,7 +143,11 @@ public class PoeImageClient : IImageGenerationClient
             ["extra_body"] = extraBody
         };
 
-        var response = await _http.PostAsJsonAsync(BaseUrl, body, JsonOptions, ct);
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, BaseUrl);
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        requestMessage.Content = JsonContent.Create(body, options: JsonOptions);
+
+        var response = await ApiHttp.SendAsync(requestMessage, ct);
         var content = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -144,7 +158,7 @@ public class PoeImageClient : IImageGenerationClient
         return content;
     }
 
-    private async Task<GeneratedImage?> ParseAndDownloadImageAsync(string responseContent, CancellationToken ct)
+    private static async Task<GeneratedImage?> ParseAndDownloadImageAsync(string responseContent, CancellationToken ct)
     {
         var json = JsonDocument.Parse(responseContent);
 
@@ -165,7 +179,7 @@ public class PoeImageClient : IImageGenerationClient
         var content = contentProp.GetString() ?? "";
 
         // Extract image URL using regex
-        var match = ImageUrlRegex.Match(content);
+        var match = ImageUrlPattern().Match(content);
         if (!match.Success)
         {
             throw new ImageGenerationException($"Could not find image URL in Poe response: {content}");
@@ -174,43 +188,20 @@ public class PoeImageClient : IImageGenerationClient
         var imageUrl = match.Value;
 
         // Download the image using the download client (no auth headers, browser-like)
-        var imageResponse = await _downloadHttp.GetAsync(imageUrl, ct);
+        var imageResponse = await DownloadHttp.GetAsync(imageUrl, ct);
         if (!imageResponse.IsSuccessStatusCode)
         {
             throw new ImageGenerationException($"Failed to download image from {imageUrl}: {(int)imageResponse.StatusCode}");
         }
 
         var imageBytes = await imageResponse.Content.ReadAsByteArrayAsync(ct);
-        var mimeType = imageResponse.Content.Headers.ContentType?.MediaType ?? GuessMimeType(imageUrl);
+        var mimeType = imageResponse.Content.Headers.ContentType?.MediaType
+                       ?? MimeTypeHelper.GuessMimeTypeFromUrl(imageUrl);
 
         return new GeneratedImage
         {
             MimeType = mimeType,
             Data = imageBytes
         };
-    }
-
-    private static string GetMimeType(string path)
-    {
-        var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext switch
-        {
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".gif" => "image/gif",
-            ".webp" => "image/webp",
-            ".bmp" => "image/bmp",
-            _ => "application/octet-stream"
-        };
-    }
-
-    private static string GuessMimeType(string url)
-    {
-        if (url.Contains(".png", StringComparison.OrdinalIgnoreCase)) return "image/png";
-        if (url.Contains(".jpg", StringComparison.OrdinalIgnoreCase) ||
-            url.Contains(".jpeg", StringComparison.OrdinalIgnoreCase)) return "image/jpeg";
-        if (url.Contains(".webp", StringComparison.OrdinalIgnoreCase)) return "image/webp";
-        if (url.Contains(".gif", StringComparison.OrdinalIgnoreCase)) return "image/gif";
-        return "image/png"; // Default
     }
 }

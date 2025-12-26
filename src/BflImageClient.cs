@@ -5,14 +5,25 @@ using ImageGenCli.Models;
 
 namespace ImageGenCli;
 
+/// <summary>
+/// Image generation client for Black Forest Labs FLUX API.
+/// Supports flux-2-pro, flux-2-flex, and flux-2-max models.
+/// </summary>
 public class BflImageClient : IImageGenerationClient
 {
-    private readonly HttpClient _http;
+    private static readonly HttpClient Http = CreateHttpClient();
     private readonly string _apiKey;
     private readonly string _model;
     private const string BaseUrl = "https://api.bfl.ml";
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MaxWaitTime = TimeSpan.FromMinutes(5);
+
+    private const int FlexDefaultSteps = 50;
+    private const double FlexDefaultGuidance = 4.5;
+    private const double MaxMegapixels = 4.0;
+    private const int DimensionMultiple = 16;
+    private const int MinDimension = 64;
+    private const int MaxReferenceImages = 8;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -20,14 +31,23 @@ public class BflImageClient : IImageGenerationClient
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    private static HttpClient CreateHttpClient()
+    {
+        return new HttpClient();
+    }
+
+    /// <summary>
+    /// Creates a new BFL FLUX image client.
+    /// </summary>
+    /// <param name="apiKey">The BFL API key.</param>
+    /// <param name="model">The model to use (default: flux-2-pro).</param>
     public BflImageClient(string apiKey, string model = "flux-2-pro")
     {
         _apiKey = apiKey;
         _model = model;
-        _http = new HttpClient();
-        _http.DefaultRequestHeaders.Add("x-key", _apiKey);
     }
 
+    /// <inheritdoc />
     public async Task<GenerationResult> GenerateImagesAsync(GenerationRequest request, CancellationToken ct = default)
     {
         var endpoint = GetEndpoint();
@@ -43,13 +63,13 @@ public class BflImageClient : IImageGenerationClient
             ["output_format"] = "png"
         };
 
-        // Add reference images if provided (up to 8)
-        for (int i = 0; i < Math.Min(request.ReferenceImages.Length, 8); i++)
+        // Add reference images if provided (up to max limit)
+        for (int i = 0; i < Math.Min(request.ReferenceImages.Length, MaxReferenceImages); i++)
         {
             var imagePath = request.ReferenceImages[i];
             var bytes = await File.ReadAllBytesAsync(imagePath, ct);
             var base64 = Convert.ToBase64String(bytes);
-            var mimeType = GetMimeType(imagePath);
+            var mimeType = MimeTypeHelper.GetMimeType(imagePath);
             var dataUri = $"data:{mimeType};base64,{base64}";
 
             var key = i == 0 ? "input_image" : $"input_image_{i + 1}";
@@ -59,8 +79,8 @@ public class BflImageClient : IImageGenerationClient
         // Flex-specific parameters
         if (_model.Contains("flex", StringComparison.OrdinalIgnoreCase))
         {
-            body["steps"] = 50;
-            body["guidance"] = 4.5;
+            body["steps"] = FlexDefaultSteps;
+            body["guidance"] = FlexDefaultGuidance;
         }
 
         var images = new List<GeneratedImage>();
@@ -74,7 +94,11 @@ public class BflImageClient : IImageGenerationClient
                 body["seed"] = Random.Shared.Next();
             }
 
-            var response = await _http.PostAsJsonAsync(url, body, JsonOptions, ct);
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url);
+            requestMessage.Headers.Add("x-key", _apiKey);
+            requestMessage.Content = JsonContent.Create(body, options: JsonOptions);
+
+            var response = await Http.SendAsync(requestMessage, ct);
             var content = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -108,7 +132,7 @@ public class BflImageClient : IImageGenerationClient
         {
             ct.ThrowIfCancellationRequested();
 
-            var response = await _http.GetAsync(pollUrl, ct);
+            var response = await Http.GetAsync(pollUrl, ct);
             var content = await response.Content.ReadAsStringAsync(ct);
 
             if (!response.IsSuccessStatusCode)
@@ -163,9 +187,9 @@ public class BflImageClient : IImageGenerationClient
         throw new ImageGenerationException($"BFL generation timed out after {MaxWaitTime.TotalMinutes} minutes");
     }
 
-    private async Task<GeneratedImage> DownloadImageAsync(string imageUrl, CancellationToken ct)
+    private static async Task<GeneratedImage> DownloadImageAsync(string imageUrl, CancellationToken ct)
     {
-        var response = await _http.GetAsync(imageUrl, ct);
+        var response = await Http.GetAsync(imageUrl, ct);
         if (!response.IsSuccessStatusCode)
         {
             throw new ImageGenerationException($"Failed to download generated image: {(int)response.StatusCode}");
@@ -202,8 +226,8 @@ public class BflImageClient : IImageGenerationClient
             _ => 1.0 // 1K default
         };
 
-        // Calculate dimensions based on aspect ratio, constrained to 4MP max
-        megapixels = Math.Min(megapixels, 4.0);
+        // Constrain to max megapixels
+        megapixels = Math.Min(megapixels, MaxMegapixels);
         var totalPixels = megapixels * 1_000_000;
 
         var (ratioW, ratioH) = ParseAspectRatio(aspectRatio);
@@ -211,13 +235,13 @@ public class BflImageClient : IImageGenerationClient
         var width = (int)(ratioW * scale);
         var height = (int)(ratioH * scale);
 
-        // Round to nearest multiple of 16 (BFL requirement)
-        width = (width / 16) * 16;
-        height = (height / 16) * 16;
+        // Round to nearest multiple (BFL requirement)
+        width = (width / DimensionMultiple) * DimensionMultiple;
+        height = (height / DimensionMultiple) * DimensionMultiple;
 
-        // Ensure minimum of 64
-        width = Math.Max(64, width);
-        height = Math.Max(64, height);
+        // Ensure minimum dimension
+        width = Math.Max(MinDimension, width);
+        height = Math.Max(MinDimension, height);
 
         return (width, height);
     }
@@ -232,20 +256,6 @@ public class BflImageClient : IImageGenerationClient
             return (w, h);
         }
         return (1, 1); // Default to square
-    }
-
-    private static string GetMimeType(string path)
-    {
-        var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext switch
-        {
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".gif" => "image/gif",
-            ".webp" => "image/webp",
-            ".bmp" => "image/bmp",
-            _ => "application/octet-stream"
-        };
     }
 
     private class AsyncResponse

@@ -278,7 +278,16 @@ rootCommand.SetHandler(async (context) =>
     // Ensure output directory exists
     if (!output.Exists)
     {
-        output.Create();
+        try
+        {
+            output.Create();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            Console.Error.WriteLine($"Error: Cannot create output directory '{output.FullName}': {ex.Message}");
+            context.ExitCode = 1;
+            return;
+        }
     }
 
     try
@@ -325,20 +334,23 @@ rootCommand.SetHandler(async (context) =>
         for (int i = 0; i < result.Images.Length; i++)
         {
             var img = result.Images[i];
-            var ext = img.MimeType switch
-            {
-                "image/png" => "png",
-                "image/jpeg" => "jpg",
-                "image/webp" => "webp",
-                _ => "png"
-            };
+            var ext = MimeTypeHelper.GetExtension(img.MimeType);
             var filename = result.Images.Length == 1
                 ? $"{prefix}-{timestamp}.{ext}"
                 : $"{prefix}-{timestamp}-{i + 1}.{ext}";
             var path = Path.Combine(output.FullName, filename);
 
-            await File.WriteAllBytesAsync(path, img.Data);
-            Console.WriteLine($"Saved: {path}");
+            try
+            {
+                await File.WriteAllBytesAsync(path, img.Data);
+                Console.WriteLine($"Saved: {path}");
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                Console.Error.WriteLine($"Error: Cannot save image to '{path}': {ex.Message}");
+                context.ExitCode = 1;
+                return;
+            }
         }
 
         if (!string.IsNullOrEmpty(result.TextResponse))

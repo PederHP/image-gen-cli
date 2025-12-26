@@ -5,21 +5,29 @@ using ImageGenCli.Models;
 
 namespace ImageGenCli;
 
+/// <summary>
+/// Image generation client for OpenAI API.
+/// Supports gpt-image-1.5 and gpt-image-1 models.
+/// </summary>
 public class OpenAIImageClient : IImageGenerationClient
 {
-    private readonly HttpClient _http;
+    private static readonly HttpClient Http = new();
     private readonly string _apiKey;
     private readonly string _model;
     private const string BaseUrl = "https://api.openai.com/v1/images";
 
+    /// <summary>
+    /// Creates a new OpenAI image client.
+    /// </summary>
+    /// <param name="apiKey">The OpenAI API key.</param>
+    /// <param name="model">The model to use (default: gpt-image-1.5).</param>
     public OpenAIImageClient(string apiKey, string model = "gpt-image-1.5")
     {
         _apiKey = apiKey;
         _model = model;
-        _http = new HttpClient();
-        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
     }
 
+    /// <inheritdoc />
     public async Task<GenerationResult> GenerateImagesAsync(GenerationRequest request, CancellationToken ct = default)
     {
         var hasReferenceImages = request.ReferenceImages.Length > 0;
@@ -46,16 +54,19 @@ public class OpenAIImageClient : IImageGenerationClient
             ["model"] = _model,
             ["prompt"] = request.Prompt,
             ["n"] = request.NumberOfImages,
-            ["size"] = MapSize(request.AspectRatio, request.Resolution)
+            ["size"] = MapSize(request.AspectRatio)
         };
 
-        // Add quality if provided
         if (!string.IsNullOrEmpty(request.Quality))
         {
             body["quality"] = request.Quality;
         }
 
-        var response = await _http.PostAsJsonAsync(url, body, ct);
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url);
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        requestMessage.Content = JsonContent.Create(body);
+
+        var response = await Http.SendAsync(requestMessage, ct);
         var content = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -74,9 +85,8 @@ public class OpenAIImageClient : IImageGenerationClient
         form.Add(new StringContent(_model), "model");
         form.Add(new StringContent(request.Prompt), "prompt");
         form.Add(new StringContent(request.NumberOfImages.ToString()), "n");
-        form.Add(new StringContent(MapSize(request.AspectRatio, request.Resolution)), "size");
+        form.Add(new StringContent(MapSize(request.AspectRatio)), "size");
 
-        // Add quality if provided
         if (!string.IsNullOrEmpty(request.Quality))
         {
             form.Add(new StringContent(request.Quality), "quality");
@@ -87,11 +97,14 @@ public class OpenAIImageClient : IImageGenerationClient
         {
             var bytes = await File.ReadAllBytesAsync(imagePath, ct);
             var imageContent = new ByteArrayContent(bytes);
-            imageContent.Headers.ContentType = new MediaTypeHeaderValue(GetMimeType(imagePath));
+            imageContent.Headers.ContentType = new MediaTypeHeaderValue(MimeTypeHelper.GetMimeType(imagePath));
             form.Add(imageContent, "image[]", Path.GetFileName(imagePath));
         }
 
-        var response = await _http.PostAsync(url, form, ct);
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, url) { Content = form };
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+
+        var response = await Http.SendAsync(requestMessage, ct);
         var content = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -128,10 +141,9 @@ public class OpenAIImageClient : IImageGenerationClient
         return result;
     }
 
-    private static string MapSize(string aspectRatio, string resolution)
+    private static string MapSize(string aspectRatio)
     {
         // OpenAI uses pixel dimensions, map from aspect ratio
-        // Common sizes: 1024x1024, 1024x1536, 1536x1024, etc.
         return aspectRatio switch
         {
             "1:1" => "1024x1024",
@@ -140,18 +152,6 @@ public class OpenAIImageClient : IImageGenerationClient
             "3:4" => "1024x1536",
             "4:3" => "1536x1024",
             _ => "1024x1024"
-        };
-    }
-
-    private static string GetMimeType(string path)
-    {
-        var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext switch
-        {
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".webp" => "image/webp",
-            _ => "application/octet-stream"
         };
     }
 }

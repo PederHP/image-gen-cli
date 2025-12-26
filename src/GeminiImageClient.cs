@@ -5,9 +5,13 @@ using ImageGenCli.Models;
 
 namespace ImageGenCli;
 
+/// <summary>
+/// Image generation client for Google Gemini API.
+/// Supports gemini-2.5-flash-image and gemini-3-pro-image-preview models.
+/// </summary>
 public class GeminiImageClient : IImageGenerationClient
 {
-    private readonly HttpClient _http;
+    private static readonly HttpClient Http = new();
     private readonly string _apiKey;
     private readonly string _model;
     private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -18,13 +22,18 @@ public class GeminiImageClient : IImageGenerationClient
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    /// <summary>
+    /// Creates a new Gemini image client.
+    /// </summary>
+    /// <param name="apiKey">The Gemini API key.</param>
+    /// <param name="model">The model to use (default: gemini-2.5-flash-image).</param>
     public GeminiImageClient(string apiKey, string model = "gemini-2.5-flash-image")
     {
         _apiKey = apiKey;
         _model = model;
-        _http = new HttpClient();
     }
 
+    /// <inheritdoc />
     public async Task<GenerationResult> GenerateImagesAsync(GenerationRequest request, CancellationToken ct = default)
     {
         var url = $"{BaseUrl}/{_model}:generateContent?key={_apiKey}";
@@ -39,7 +48,7 @@ public class GeminiImageClient : IImageGenerationClient
         {
             var bytes = await File.ReadAllBytesAsync(imagePath, ct);
             var base64 = Convert.ToBase64String(bytes);
-            var mimeType = GetMimeType(imagePath);
+            var mimeType = MimeTypeHelper.GetMimeType(imagePath);
             parts.Add(new
             {
                 inline_data = new
@@ -80,7 +89,7 @@ public class GeminiImageClient : IImageGenerationClient
             };
         }
 
-        var response = await _http.PostAsJsonAsync(url, body, JsonOptions, ct);
+        var response = await Http.PostAsJsonAsync(url, body, JsonOptions, ct);
         var content = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
@@ -106,6 +115,7 @@ public class GeminiImageClient : IImageGenerationClient
                         {
                             textParts.Add(textProp.GetString() ?? "");
                         }
+                        // Handle both camelCase and snake_case property names
                         else if (part.TryGetProperty("inlineData", out var inlineData) ||
                                  part.TryGetProperty("inline_data", out inlineData))
                         {
@@ -128,19 +138,5 @@ public class GeminiImageClient : IImageGenerationClient
         result.TextResponse = string.Join("\n", textParts.Where(t => !string.IsNullOrWhiteSpace(t)));
 
         return result;
-    }
-
-    private static string GetMimeType(string path)
-    {
-        var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext switch
-        {
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".gif" => "image/gif",
-            ".webp" => "image/webp",
-            ".bmp" => "image/bmp",
-            _ => "application/octet-stream"
-        };
     }
 }
