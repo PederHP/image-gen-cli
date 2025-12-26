@@ -127,6 +127,29 @@ rootCommand.SetHandler(async (context) =>
         return;
     }
 
+    // Validate provider-specific parameter compatibility
+    if (provider == "openai")
+    {
+        if (resolution != "1K")
+        {
+            Console.Error.WriteLine("Error: --resolution is not supported by OpenAI. Remove this option (OpenAI uses fixed sizes based on aspect ratio).");
+            context.ExitCode = 1;
+            return;
+        }
+        if (!string.IsNullOrEmpty(systemPrompt))
+        {
+            Console.Error.WriteLine("Error: --system-prompt is not supported by OpenAI.");
+            context.ExitCode = 1;
+            return;
+        }
+        if (temperature != 1.0f)
+        {
+            Console.Error.WriteLine("Error: --temperature is not supported by OpenAI.");
+            context.ExitCode = 1;
+            return;
+        }
+    }
+
     // Validate reference images exist
     foreach (var image in images)
     {
