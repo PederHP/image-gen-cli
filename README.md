@@ -110,6 +110,10 @@ image-gen -m gemini-3-pro-image-preview -r 2K "Detailed architectural blueprint"
 
 **Note:** Using unsupported options with a provider will result in an error. For example, `--temperature` with OpenAI will fail.
 
+### Poe Provider Privacy Warning
+
+**Important:** Images generated through the Poe provider are returned as URLs that are **publicly accessible without authentication**. While the URLs are not easily guessable, anyone with the link can view the image. Do not use the Poe provider for generating sensitive or private content if URL confidentiality is a concern.
+
 ## Output
 
 Generated images are saved with the naming pattern:
