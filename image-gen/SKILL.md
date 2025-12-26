@@ -16,6 +16,143 @@ Generate images from text prompts or edit existing images using Gemini or OpenAI
 - Generating multiple variations of an image concept
 - Creating images with specific aspect ratios
 
+## Workflows
+
+Modern image models (Gemini and GPT-Image-1.5) are highly capable at instruction following. They can render readable text, create diagrams, produce technical illustrations, and handle complex multi-element compositions. The quality of output depends heavily on prompt articulation and iterative refinement.
+
+### Articulating the Desired Output
+
+Before generating, clearly define the intent:
+
+**Well-defined outputs** (diagrams, UI mockups, illustrations with specific requirements):
+- Be explicit about every element: layout, colors, text content, style
+- Specify what should NOT appear if relevant
+- Example: "A flowchart showing user authentication flow. Three boxes labeled 'Login Form', 'Validate Credentials', 'Dashboard'. Arrows connecting left to right. Clean minimal style, black lines on white background, sans-serif font."
+
+**Creative exploration** (concept art, aesthetic exploration, inspiration):
+- Provide mood, style references, and general direction
+- Leave room for interpretation
+- Example: "Concept art for a solarpunk city. Organic architecture integrated with nature. Morning light. Studio Ghibli inspired, painterly style."
+
+**Balanced approach** (most common):
+- Specify the critical elements precisely
+- Allow flexibility on secondary details
+- Example: "Product photo of a ceramic coffee mug, matte black finish, on a wooden table. Natural lighting, shallow depth of field. The mug should be the clear focus."
+
+### Generation Budget Strategy
+
+Image generation has an inference cost, either API credits or use of compute resources. Establish a budget strategy based on context:
+
+**Conversational mode** (working with a user):
+- Ask the user about their budget tolerance before starting
+- Start with 1-2 generations to validate direction
+- Show results and gather feedback before generating more
+- Offer choices: "Should I generate 4 variations to explore, or refine this single direction?"
+
+**Autonomous mode** (agentic task execution):
+- Infer budget from task context and constraints
+- For well-defined outputs: start with 1 generation, evaluate, iterate if needed
+- For creative exploration: generate 2-4 variations upfront to compare
+- Set a reasonable maximum (e.g., 6-10 total generations) unless context suggests otherwise
+- Document your generation decisions for transparency
+
+**Budget guidelines by task type:**
+| Task Type | Initial | Max Iterations | Notes |
+|-----------|---------|----------------|-------|
+| Precise diagram/text | 1 | 3-4 | Refine prompt if text/layout wrong |
+| Product/marketing image | 2-3 | 5-6 | Variations help find best composition |
+| Creative concept art | 3-4 | 8-10 | Exploration is the point |
+| Quick illustration | 1 | 2 | Speed over perfection |
+
+### Iterative Refinement
+
+After each generation, evaluate the output and decide the next step:
+
+**Option 1: Accept** — Output meets requirements. Done.
+
+**Option 2: Regenerate with refined prompt** — When the concept or composition needs adjustment:
+- Analyze what's wrong: style, composition, missing elements, wrong interpretation
+- Adjust the prompt to address specific issues
+- Add negative guidance if something unwanted keeps appearing
+- Example: First attempt has wrong style → add "photorealistic, not illustrated, not cartoon"
+
+**Option 3: Edit with reference image (-i)** — When the base is good but needs modification:
+- Use when composition/layout is correct but details need changes
+- Use for removing/adding specific elements
+- Use for style adjustments while preserving structure
+- Example: `image-gen -i first-output.png "Same composition but change the sky to sunset colors"`
+
+**Decision guide:**
+```
+Is the overall composition/layout acceptable?
+├─ No → Regenerate with refined prompt
+└─ Yes → Are specific elements wrong?
+         ├─ Yes → Edit with -i flag
+         └─ No → Accept or minor prompt refinement
+```
+
+### Using Reference Images
+
+The `-i` flag serves multiple purposes beyond editing:
+
+**Style transfer:**
+```bash
+image-gen -i style-reference.jpg "A portrait of a woman in this artistic style"
+```
+
+**Character/subject consistency:**
+```bash
+# First, generate a character
+image-gen "A robot mascot, friendly rounded design, blue and white" -o ./character
+
+# Then use it as reference for new scenes
+image-gen -i ./character/gemini-*.png "The same robot mascot waving hello, standing in a garden"
+```
+
+**Composition guidance:**
+```bash
+image-gen -i layout-sketch.png "A detailed illustration following this layout. Fantasy landscape with castle on the left, forest on the right"
+```
+
+**Multi-reference combination:**
+```bash
+image-gen -i style.jpg -i subject.jpg "Combine the artistic style of the first image with the subject matter of the second"
+```
+
+### Workflow Example: Logo Design
+
+```
+1. Understand requirements (conversational) or extract from context (autonomous)
+   - Brand name, industry, style preferences, colors
+
+2. Initial exploration (budget: 3-4 images)
+   image-gen -n 4 "Minimalist logo for 'Horizon Analytics', data/analytics company.
+   Abstract geometric mark. Professional, modern. Blue and gray palette."
+
+3. Evaluate outputs
+   - Which direction resonates? Which elements work?
+
+4. Refine best direction (budget: 2-3 more)
+   image-gen -n 2 "Minimalist logo for 'Horizon Analytics'. Abstract rising line
+   forming a subtle 'H' shape. Single weight lines. Navy blue on white.
+   No gradients, no text, mark only."
+
+5. Polish with editing if needed
+   image-gen -i best-logo.png "Same logo but adjust proportions to be more
+   horizontally balanced. Maintain exact style."
+
+6. Final variations (optional)
+   image-gen -i final-logo.png "Create a reversed version, white mark on navy background"
+```
+
+### Tips for Better Results
+
+- **Be specific about style**: "watercolor", "3D render", "flat vector", "photograph" yield very different results
+- **Specify viewpoint**: "top-down view", "isometric", "eye-level", "close-up"
+- **Include context for text**: These models can render text well—specify font style, size relationship, placement
+- **Use negative guidance**: "no text", "no watermark", "not photorealistic" when needed
+- **Aspect ratio matters**: Choose based on content (portraits → 2:3 or 9:16, landscapes → 16:9, social → 1:1)
+
 ## Prerequisites
 
 The `image-gen` command must be installed. Install with:
