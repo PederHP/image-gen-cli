@@ -2,7 +2,7 @@
 set -e
 
 # Install image-gen CLI tool
-# Requires: .NET 8.0 SDK
+# Requires: .NET 10.0 SDK
 
 echo "Installing image-gen CLI..."
 
@@ -14,8 +14,8 @@ fi
 
 # Check .NET version
 DOTNET_VERSION=$(dotnet --version | cut -d. -f1)
-if [ "$DOTNET_VERSION" -lt 8 ]; then
-    echo "Error: .NET 8.0 or later required (found: $(dotnet --version))" >&2
+if [ "$DOTNET_VERSION" -lt 10 ]; then
+    echo "Error: .NET 10.0 or later required (found: $(dotnet --version))" >&2
     exit 1
 fi
 

@@ -2,112 +2,124 @@ using System.CommandLine;
 using ImageGenCli;
 using ImageGenCli.Models;
 
-var promptArg = new Argument<string>("prompt", "The text prompt for image generation");
-
-var providerOption = new Option<string>(
-    ["--provider", "-p"],
-    () => "gemini",
-    "Provider: gemini, openai, bfl, or poe");
-
-var systemPromptOption = new Option<string?>(
-    ["--system-prompt", "-s"],
-    "Optional system instruction for the model (Gemini only)");
-
-var imagesOption = new Option<FileInfo[]>(
-    ["--images", "-i"],
-    "Reference image file paths (0-N images)")
-{ AllowMultipleArgumentsPerToken = true };
-
-var aspectRatioOption = new Option<string>(
-    ["--aspect-ratio", "-a"],
-    () => "1:1",
-    "Aspect ratio: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9");
-
-var resolutionOption = new Option<string>(
-    ["--resolution", "-r"],
-    () => "1K",
-    "Output resolution: 1K, 2K, 4K (Gemini Pro, BFL, some Poe models)");
-
-var qualityOption = new Option<string?>(
-    ["--quality", "-q"],
-    "Quality level: low, medium, high (OpenAI, Poe)");
-
-var temperatureOption = new Option<float>(
-    ["--temperature", "-t"],
-    () => 1.0f,
-    "Generation temperature (0.0-2.0, Gemini only)");
-
-var modelOption = new Option<string?>(
-    ["--model", "-m"],
-    "Model name (use --list-models to see available models per provider)");
-
-var samplesOption = new Option<int>(
-    ["--samples", "-n"],
-    () => 1,
-    "Number of images to generate (1-4 for Gemini, 1-10 for OpenAI)");
-
-var outputOption = new Option<DirectoryInfo>(
-    ["--output", "-o"],
-    () => new DirectoryInfo(Directory.GetCurrentDirectory()),
-    "Output directory for generated images");
-
-var apiKeyOption = new Option<string?>(
-    ["--api-key", "-k"],
-    "API key (or set GEMINI_API_KEY / OPENAI_API_KEY / BFL_API_KEY / POE_API_KEY env var)");
-
-var listModelsOption = new Option<bool>(
-    ["--list-models", "-l"],
-    "List available models for the specified provider");
-
-var rootCommand = new RootCommand("Generate images using Gemini, OpenAI, BFL (FLUX), or Poe image models")
+var promptArg = new Argument<string>("prompt")
 {
-    promptArg,
-    providerOption,
-    systemPromptOption,
-    imagesOption,
-    aspectRatioOption,
-    resolutionOption,
-    qualityOption,
-    temperatureOption,
-    modelOption,
-    samplesOption,
-    outputOption,
-    apiKeyOption,
-    listModelsOption
+    Description = "The text prompt for image generation"
 };
 
-// Make prompt optional when --list-models is used
-promptArg.SetDefaultValue("");
-
-rootCommand.SetHandler(async (context) =>
+var providerOption = new Option<string>("--provider", "-p")
 {
-    var prompt = context.ParseResult.GetValueForArgument(promptArg);
-    var provider = context.ParseResult.GetValueForOption(providerOption)!.ToLowerInvariant();
-    var systemPrompt = context.ParseResult.GetValueForOption(systemPromptOption);
-    var images = context.ParseResult.GetValueForOption(imagesOption) ?? [];
-    var aspectRatio = context.ParseResult.GetValueForOption(aspectRatioOption)!;
-    var resolution = context.ParseResult.GetValueForOption(resolutionOption)!;
-    var quality = context.ParseResult.GetValueForOption(qualityOption);
-    var temperature = context.ParseResult.GetValueForOption(temperatureOption);
-    var modelOverride = context.ParseResult.GetValueForOption(modelOption);
-    var samples = context.ParseResult.GetValueForOption(samplesOption);
-    var output = context.ParseResult.GetValueForOption(outputOption)!;
-    var apiKeyOverride = context.ParseResult.GetValueForOption(apiKeyOption);
-    var listModels = context.ParseResult.GetValueForOption(listModelsOption);
+    Description = "Provider: gemini, openai, bfl, or poe",
+    DefaultValueFactory = _ => "gemini"
+};
+
+var systemPromptOption = new Option<string?>("--system-prompt", "-s")
+{
+    Description = "Optional system instruction for the model (Gemini only)"
+};
+
+var imagesOption = new Option<FileInfo[]>("--images", "-i")
+{
+    Description = "Reference image file paths (0-N images)",
+    AllowMultipleArgumentsPerToken = true
+};
+
+var aspectRatioOption = new Option<string>("--aspect-ratio", "-a")
+{
+    Description = "Aspect ratio: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9",
+    DefaultValueFactory = _ => "1:1"
+};
+
+var resolutionOption = new Option<string>("--resolution", "-r")
+{
+    Description = "Output resolution: 1K, 2K, 4K (Gemini Pro, BFL, some Poe models)",
+    DefaultValueFactory = _ => "1K"
+};
+
+var qualityOption = new Option<string?>("--quality", "-q")
+{
+    Description = "Quality level: low, medium, high (OpenAI, Poe)"
+};
+
+var temperatureOption = new Option<float>("--temperature", "-t")
+{
+    Description = "Generation temperature (0.0-2.0, Gemini only)",
+    DefaultValueFactory = _ => 1.0f
+};
+
+var modelOption = new Option<string?>("--model", "-m")
+{
+    Description = "Model name (use --list-models to see available models per provider)"
+};
+
+var samplesOption = new Option<int>("--samples", "-n")
+{
+    Description = "Number of images to generate (1-4 for Gemini, 1-10 for OpenAI)",
+    DefaultValueFactory = _ => 1
+};
+
+var outputOption = new Option<DirectoryInfo>("--output", "-o")
+{
+    Description = "Output directory for generated images",
+    DefaultValueFactory = _ => new DirectoryInfo(Directory.GetCurrentDirectory())
+};
+
+var apiKeyOption = new Option<string?>("--api-key", "-k")
+{
+    Description = "API key (or set GEMINI_API_KEY / OPENAI_API_KEY / BFL_API_KEY / POE_API_KEY env var)"
+};
+
+var listModelsOption = new Option<bool>("--list-models", "-l")
+{
+    Description = "List available models for the specified provider"
+};
+
+var rootCommand = new RootCommand("Generate images using Gemini, OpenAI, BFL (FLUX), or Poe image models");
+rootCommand.Arguments.Add(promptArg);
+rootCommand.Options.Add(providerOption);
+rootCommand.Options.Add(systemPromptOption);
+rootCommand.Options.Add(imagesOption);
+rootCommand.Options.Add(aspectRatioOption);
+rootCommand.Options.Add(resolutionOption);
+rootCommand.Options.Add(qualityOption);
+rootCommand.Options.Add(temperatureOption);
+rootCommand.Options.Add(modelOption);
+rootCommand.Options.Add(samplesOption);
+rootCommand.Options.Add(outputOption);
+rootCommand.Options.Add(apiKeyOption);
+rootCommand.Options.Add(listModelsOption);
+
+// Make prompt optional when --list-models is used
+promptArg.DefaultValueFactory = _ => "";
+
+rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancellationToken) =>
+{
+    var prompt = parseResult.GetValue(promptArg) ?? "";
+    var provider = (parseResult.GetValue(providerOption) ?? "gemini").ToLowerInvariant();
+    var systemPrompt = parseResult.GetValue(systemPromptOption);
+    var images = parseResult.GetValue(imagesOption) ?? [];
+    var aspectRatio = parseResult.GetValue(aspectRatioOption) ?? "1:1";
+    var resolution = parseResult.GetValue(resolutionOption) ?? "1K";
+    var quality = parseResult.GetValue(qualityOption);
+    var temperature = parseResult.GetValue(temperatureOption);
+    var modelOverride = parseResult.GetValue(modelOption);
+    var samples = parseResult.GetValue(samplesOption);
+    var output = parseResult.GetValue(outputOption) ?? new DirectoryInfo(Directory.GetCurrentDirectory());
+    var apiKeyOverride = parseResult.GetValue(apiKeyOption);
+    var listModels = parseResult.GetValue(listModelsOption);
 
     // Handle --list-models
     if (listModels)
     {
         PrintModelsForProvider(provider);
-        return;
+        return 0;
     }
 
     // Validate prompt is provided when not listing models
     if (string.IsNullOrEmpty(prompt))
     {
         Console.Error.WriteLine("Error: Prompt is required. Use --help for usage information.");
-        context.ExitCode = 1;
-        return;
+        return 1;
     }
 
     // Determine API key based on provider
@@ -129,8 +141,7 @@ rootCommand.SetHandler(async (context) =>
             _ => "GEMINI_API_KEY"
         };
         Console.Error.WriteLine($"Error: API key required. Use --api-key or set {envVar} env var.");
-        context.ExitCode = 1;
-        return;
+        return 1;
     }
 
     // Determine model based on provider
@@ -146,8 +157,7 @@ rootCommand.SetHandler(async (context) =>
     if (provider != "gemini" && provider != "openai" && provider != "bfl" && provider != "poe")
     {
         Console.Error.WriteLine($"Error: Invalid provider '{provider}'. Valid: gemini, openai, bfl, poe");
-        context.ExitCode = 1;
-        return;
+        return 1;
     }
 
     // Validate inputs
@@ -155,8 +165,7 @@ rootCommand.SetHandler(async (context) =>
     if (!validAspectRatios.Contains(aspectRatio))
     {
         Console.Error.WriteLine($"Error: Invalid aspect ratio '{aspectRatio}'. Valid: {string.Join(", ", validAspectRatios)}");
-        context.ExitCode = 1;
-        return;
+        return 1;
     }
 
     // Validate quality if provided
@@ -166,8 +175,7 @@ rootCommand.SetHandler(async (context) =>
         if (!validQualities.Contains(quality.ToLowerInvariant()))
         {
             Console.Error.WriteLine($"Error: Invalid quality '{quality}'. Valid: {string.Join(", ", validQualities)}");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
         quality = quality.ToLowerInvariant();
     }
@@ -182,8 +190,7 @@ rootCommand.SetHandler(async (context) =>
     if (samples < 1 || samples > maxSamples)
     {
         Console.Error.WriteLine($"Error: Samples must be between 1 and {maxSamples}.");
-        context.ExitCode = 1;
-        return;
+        return 1;
     }
 
     // Validate provider-specific parameter compatibility
@@ -192,8 +199,7 @@ rootCommand.SetHandler(async (context) =>
         if (!string.IsNullOrEmpty(quality))
         {
             Console.Error.WriteLine("Error: --quality is not supported by Gemini. Use --resolution instead.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
     }
 
@@ -202,20 +208,17 @@ rootCommand.SetHandler(async (context) =>
         if (resolution != "1K")
         {
             Console.Error.WriteLine("Error: --resolution is not supported by OpenAI. Use --quality instead.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
         if (!string.IsNullOrEmpty(systemPrompt))
         {
             Console.Error.WriteLine("Error: --system-prompt is not supported by OpenAI.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
         if (temperature != 1.0f)
         {
             Console.Error.WriteLine("Error: --temperature is not supported by OpenAI.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
     }
 
@@ -224,26 +227,22 @@ rootCommand.SetHandler(async (context) =>
         if (!string.IsNullOrEmpty(systemPrompt))
         {
             Console.Error.WriteLine("Error: --system-prompt is not supported by BFL.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
         if (temperature != 1.0f)
         {
             Console.Error.WriteLine("Error: --temperature is not supported by BFL.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
         if (!string.IsNullOrEmpty(quality))
         {
             Console.Error.WriteLine("Error: --quality is not supported by BFL. Use --resolution instead.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
         if (images.Length > 8)
         {
             Console.Error.WriteLine("Error: BFL supports a maximum of 8 reference images.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
     }
 
@@ -252,14 +251,12 @@ rootCommand.SetHandler(async (context) =>
         if (!string.IsNullOrEmpty(systemPrompt))
         {
             Console.Error.WriteLine("Error: --system-prompt is not supported by Poe.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
         if (temperature != 1.0f)
         {
             Console.Error.WriteLine("Error: --temperature is not supported by Poe.");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
         // Note: resolution passed through to API - some models may support it
     }
@@ -270,8 +267,7 @@ rootCommand.SetHandler(async (context) =>
         if (!image.Exists)
         {
             Console.Error.WriteLine($"Error: Reference image not found: {image.FullName}");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
     }
 
@@ -285,8 +281,7 @@ rootCommand.SetHandler(async (context) =>
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
             Console.Error.WriteLine($"Error: Cannot create output directory '{output.FullName}': {ex.Message}");
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
     }
 
@@ -310,7 +305,7 @@ rootCommand.SetHandler(async (context) =>
             Quality = quality,
             Temperature = temperature,
             NumberOfImages = samples
-        });
+        }, cancellationToken);
 
         if (result.Images.Length == 0)
         {
@@ -319,8 +314,7 @@ rootCommand.SetHandler(async (context) =>
             {
                 Console.Error.WriteLine($"Model response: {result.TextResponse}");
             }
-            context.ExitCode = 1;
-            return;
+            return 1;
         }
 
         var prefix = provider switch
@@ -342,14 +336,13 @@ rootCommand.SetHandler(async (context) =>
 
             try
             {
-                await File.WriteAllBytesAsync(path, img.Data);
+                await File.WriteAllBytesAsync(path, img.Data, cancellationToken);
                 Console.WriteLine($"Saved: {path}");
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
             {
                 Console.Error.WriteLine($"Error: Cannot save image to '{path}': {ex.Message}");
-                context.ExitCode = 1;
-                return;
+                return 1;
             }
         }
 
@@ -357,20 +350,22 @@ rootCommand.SetHandler(async (context) =>
         {
             Console.WriteLine($"\nModel commentary: {result.TextResponse}");
         }
+
+        return 0;
     }
     catch (ImageGenerationException ex)
     {
         Console.Error.WriteLine($"API Error: {ex.Message}");
-        context.ExitCode = 1;
+        return 1;
     }
     catch (HttpRequestException ex)
     {
         Console.Error.WriteLine($"Network Error: {ex.Message}");
-        context.ExitCode = 1;
+        return 1;
     }
 });
 
-return await rootCommand.InvokeAsync(args);
+return await rootCommand.Parse(args).InvokeAsync();
 
 static void PrintModelsForProvider(string provider)
 {

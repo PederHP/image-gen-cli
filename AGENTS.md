@@ -21,7 +21,7 @@ image-gen "Your prompt here"
 
 ## Architecture
 
-Multi-provider image generation CLI using .NET 8 and System.CommandLine.
+Multi-provider image generation CLI using .NET 10 and System.CommandLine.
 
 **Provider Pattern:**
 - `IImageGenerationClient` - common interface for all providers

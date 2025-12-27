@@ -1,5 +1,5 @@
 # Install image-gen CLI tool
-# Requires: .NET 8.0 SDK
+# Requires: .NET 10.0 SDK
 
 $ErrorActionPreference = "Stop"
 
@@ -15,8 +15,8 @@ try {
 
 # Check .NET version
 $majorVersion = [int]($dotnetVersion -split '\.')[0]
-if ($majorVersion -lt 8) {
-    Write-Error "Error: .NET 8.0 or later required (found: $dotnetVersion)"
+if ($majorVersion -lt 10) {
+    Write-Error "Error: .NET 10.0 or later required (found: $dotnetVersion)"
     exit 1
 }
 

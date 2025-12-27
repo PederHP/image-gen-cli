@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>ImageGenCli</RootNamespace>
@@ -12,14 +12,14 @@
     <ToolCommandName>image-gen</ToolCommandName>
     <PackageId>ImageGenCli</PackageId>
     <Version>1.0.0</Version>
-    <Description>Multi-provider image generation CLI supporting Gemini and OpenAI</Description>
+    <Description>Multi-provider image generation CLI supporting Gemini, OpenAI, BFL FLUX, and Poe</Description>
     <Authors>image-gen-cli contributors</Authors>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="System.CommandLine" Version="2.0.1" />
   </ItemGroup>
 
   <ItemGroup>

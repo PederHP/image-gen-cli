@@ -2,7 +2,7 @@
 name: image-gen
 description: Generate and edit images using AI models (Gemini, OpenAI, BFL FLUX, or Poe). Use this skill when you need to create images from text prompts, edit existing images, or generate variations. Supports multiple providers with automatic API key detection from environment variables.
 license: MIT
-compatibility: Requires .NET 8.0 runtime and at least one of GEMINI_API_KEY, OPENAI_API_KEY, BFL_API_KEY, or POE_API_KEY environment variable
+compatibility: Requires .NET 10.0 runtime and at least one of GEMINI_API_KEY, OPENAI_API_KEY, BFL_API_KEY, or POE_API_KEY environment variable
 ---
 
 # Image Generation Skill

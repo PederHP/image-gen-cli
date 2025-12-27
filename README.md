@@ -1,19 +1,19 @@
 # image-gen-cli
 
-A multi-provider image generation CLI supporting Google Gemini and OpenAI image models.
+A multi-provider image generation CLI supporting Google Gemini, OpenAI, BFL FLUX, and Poe image models.
 
 ## Features
 
 - Generate images from text prompts
 - Edit existing images with text instructions
-- Multiple provider support (Gemini, OpenAI)
+- Multiple provider support (Gemini, OpenAI, BFL, Poe)
 - Configurable aspect ratios and output sizes
 - Generate multiple images in a single request
 - Includes an [Agent Skill](https://agentskills.io) for AI agent integration
 
 ## Installation
 
-**Requirements:** .NET 8.0 SDK
+**Requirements:** .NET 10.0 SDK
 
 ### Install as Global Tool (Recommended)
 
@@ -42,7 +42,7 @@ dotnet run --project src/ImageGenCli.csproj -- "Your prompt here"
 
 ## Configuration
 
-Set your API key as an environment variable:
+Set at least one API key as an environment variable:
 
 ```bash
 # For Gemini (default provider)
@@ -50,6 +50,12 @@ export GEMINI_API_KEY=your-api-key
 
 # For OpenAI
 export OPENAI_API_KEY=your-api-key
+
+# For BFL (FLUX)
+export BFL_API_KEY=your-api-key
+
+# For Poe
+export POE_API_KEY=your-api-key
 ```
 
 Or pass it directly with `--api-key`.
@@ -62,6 +68,13 @@ image-gen "A sunset over mountains with a lake reflection"
 
 # Use OpenAI provider
 image-gen -p openai "A futuristic city skyline at night"
+
+# Use BFL FLUX provider
+image-gen -p bfl "A cyberpunk street scene with neon signs"
+
+# Use Poe provider (access to many models)
+image-gen -p poe "A watercolor landscape"
+image-gen -p poe -m Imagen-4 "A photorealistic portrait"
 
 # Specify aspect ratio
 image-gen -a 16:9 "Desktop wallpaper, abstract geometric art"
@@ -80,33 +93,39 @@ image-gen -o ./output "Product photography, ceramic mug"
 
 # High quality with Gemini Pro
 image-gen -m gemini-3-pro-image-preview -r 2K "Detailed architectural blueprint"
+
+# List available models for a provider
+image-gen --list-models -p poe
 ```
 
 ## Options
 
 | Option | Short | Default | Description |
 |--------|-------|---------|-------------|
-| `--provider` | `-p` | `gemini` | Provider: `gemini` or `openai` |
-| `--model` | `-m` | auto | Model name |
-| `--images` | `-i` | none | Reference image paths |
+| `--provider` | `-p` | `gemini` | Provider: `gemini`, `openai`, `bfl`, or `poe` |
+| `--model` | `-m` | auto | Model name (use `--list-models` to see options) |
+| `--images` | `-i` | none | Reference image paths (can specify multiple) |
 | `--aspect-ratio` | `-a` | `1:1` | Aspect ratio (1:1, 2:3, 3:2, 3:4, 4:3, 9:16, 16:9, etc.) |
-| `--resolution` | `-r` | `1K` | Resolution: 1K, 2K, 4K (Gemini Pro only) |
+| `--resolution` | `-r` | `1K` | Resolution: 1K, 2K, 4K (Gemini Pro, BFL, some Poe models) |
+| `--quality` | `-q` | none | Quality: low, medium, high (OpenAI, Poe) |
 | `--temperature` | `-t` | `1.0` | Temperature 0.0-2.0 (Gemini only) |
 | `--system-prompt` | `-s` | none | System instruction (Gemini only) |
-| `--samples` | `-n` | `1` | Number of images (1-4 Gemini, 1-10 OpenAI) |
+| `--samples` | `-n` | `1` | Number of images (1-4 Gemini, 1-10 others) |
 | `--output` | `-o` | current dir | Output directory |
 | `--api-key` | `-k` | env var | API key override |
+| `--list-models` | `-l` | - | List available models for the provider |
 
 ## Provider Comparison
 
-| Feature | Gemini | OpenAI |
-|---------|--------|--------|
-| Default model | gemini-2.5-flash-image | gpt-image-1.5 |
-| System prompts | Yes | No |
-| Temperature control | Yes | No |
-| Resolution control | Pro models | No (fixed sizes) |
-| Max images per request | 4 | 10 |
-| Reference image editing | Yes | Yes |
+| Feature | Gemini | OpenAI | BFL | Poe |
+|---------|--------|--------|-----|-----|
+| Default model | gemini-2.5-flash-image | gpt-image-1.5 | flux-2-pro | GPT-Image-1 |
+| System prompts | Yes | No | No | No |
+| Temperature control | Yes | No | No | No |
+| Resolution control | Pro models | No | Yes | Model-dependent |
+| Quality control | No | Yes | No | Yes |
+| Max images per request | 4 | 10 | 10 | 10 |
+| Max reference images | N/A | N/A | 8 | N/A |
 
 **Note:** Using unsupported options with a provider will result in an error. For example, `--temperature` with OpenAI will fail.
 
