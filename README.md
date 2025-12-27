@@ -19,7 +19,7 @@ A multi-provider image generation CLI supporting Google Gemini, OpenAI, BFL FLUX
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/image-gen-cli.git
+git clone https://github.com/PederHP/image-gen-cli.git
 cd image-gen-cli
 
 # Build and install
