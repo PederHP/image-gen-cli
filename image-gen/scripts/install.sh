@@ -32,6 +32,8 @@ fi
 
 echo "Installation complete. Run 'image-gen --help' to get started."
 echo ""
-echo "Set your API key:"
-echo "  export GEMINI_API_KEY=your-key    # for Gemini"
+echo "Set at least one API key:"
+echo "  export GEMINI_API_KEY=your-key    # for Gemini (default)"
 echo "  export OPENAI_API_KEY=your-key    # for OpenAI"
+echo "  export BFL_API_KEY=your-key       # for BFL (FLUX)"
+echo "  export POE_API_KEY=your-key       # for Poe"

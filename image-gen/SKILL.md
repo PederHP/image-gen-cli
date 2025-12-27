@@ -9,7 +9,7 @@ compatibility: Requires .NET 8.0 runtime and at least one of GEMINI_API_KEY, OPE
 
 Generate images from text prompts or edit existing images using Gemini, OpenAI, BFL (FLUX), or Poe image models.
 
-For detailed model information, see [MODELS.md](MODELS.md) or run `image-gen --list-models -p <provider>`.
+For detailed model information, see [MODELS.md](references/MODELS.md) or run `image-gen --list-models -p <provider>`.
 
 ## When to Use This Skill
 
