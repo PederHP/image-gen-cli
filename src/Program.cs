@@ -32,7 +32,7 @@ var aspectRatioOption = new Option<string>("--aspect-ratio", "-a")
 
 var resolutionOption = new Option<string>("--resolution", "-r")
 {
-    Description = "Output resolution: 1K, 2K, 4K (Gemini Pro, BFL, some Poe models)",
+    Description = "Output resolution: 1K, 2K, 4K (Gemini Pro, BFL, some Poe models); WxH or aspect ratio for OpenAI gpt-image-2",
     DefaultValueFactory = _ => "1K"
 };
 
@@ -147,7 +147,7 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
     // Determine model based on provider
     var model = modelOverride ?? provider switch
     {
-        "openai" => "gpt-image-1.5",
+        "openai" => "gpt-image-2",
         "bfl" => "flux-2-pro",
         "poe" => "GPT-Image-1",
         _ => "gemini-2.5-flash-image"
@@ -205,10 +205,18 @@ rootCommand.SetAction(async (ParseResult parseResult, CancellationToken cancella
 
     if (provider == "openai")
     {
-        if (resolution != "1K")
+        if (resolution != "1K" && model != "gpt-image-2")
         {
-            Console.Error.WriteLine("Error: --resolution is not supported by OpenAI. Use --quality instead.");
+            Console.Error.WriteLine($"Error: --resolution is only supported on gpt-image-2 (got model '{model}'). Use --quality instead.");
             return 1;
+        }
+        if (model == "gpt-image-2" && resolution != "1K")
+        {
+            if (!OpenAIImageClient.TryResolveSize(resolution, out _, out var sizeError))
+            {
+                Console.Error.WriteLine($"Error: {sizeError}");
+                return 1;
+            }
         }
         if (!string.IsNullOrEmpty(systemPrompt))
         {
@@ -379,8 +387,15 @@ static void PrintModelsForProvider(string provider)
             break;
 
         case "openai":
-            Console.WriteLine("  gpt-image-1.5    (default) Latest model, exceptional quality");
-            Console.WriteLine("  gpt-image-1                Previous generation model");
+            Console.WriteLine("  gpt-image-2      (default) Latest model, supports --resolution (WxH or aspect ratio)");
+            Console.WriteLine("  gpt-image-1.5              Previous generation model");
+            Console.WriteLine("  gpt-image-1                Earlier generation model");
+            Console.WriteLine("  gpt-image-1-mini           Lightweight model for basic generation");
+            Console.WriteLine();
+            Console.WriteLine("gpt-image-2 --resolution constraints:");
+            Console.WriteLine("  WxH form (e.g. 2048x1152): each edge multiple of 16, max edge 3840px,");
+            Console.WriteLine("  long:short ratio ≤ 3:1, total pixels between 655,360 and 8,294,400.");
+            Console.WriteLine("  Aspect ratio form (e.g. 3:2) maps to a preset near 2K.");
             break;
 
         case "bfl":

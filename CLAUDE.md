@@ -26,7 +26,7 @@ Multi-provider image generation CLI using .NET 10 and System.CommandLine.
 **Provider Pattern:**
 - `IImageGenerationClient` - common interface for all providers
 - `GeminiImageClient` - Google Gemini API (gemini-2.5-flash-image, gemini-3-pro-image-preview)
-- `OpenAIImageClient` - OpenAI API (gpt-image-1.5, gpt-image-1)
+- `OpenAIImageClient` - OpenAI API (gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini)
 - `BflImageClient` - Black Forest Labs FLUX API (flux-2-pro, flux-2-flex, flux-2-max)
 - `PoeImageClient` - Poe.com API (unified access to many models)
 
@@ -47,7 +47,7 @@ Parameters validated at runtime - using unsupported options with a provider caus
 |-----------|--------|--------|-----|-----|
 | `--system-prompt` | Supported | Error | Error | Error |
 | `--temperature` | Supported (0.0-2.0) | Error | Error | Error |
-| `--resolution` | Pro models only | Error | Supported | Model-dependent |
+| `--resolution` | Pro models only | gpt-image-2 only | Supported | Model-dependent |
 | `--quality` | Error | Supported | Error | Supported |
 | `--samples` max | 4 | 10 | 10 | 10 |
 | `--images` max | N/A | N/A | 8 | N/A |

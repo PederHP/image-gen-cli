@@ -119,10 +119,10 @@ image-gen --list-models -p poe
 
 | Feature | Gemini | OpenAI | BFL | Poe |
 |---------|--------|--------|-----|-----|
-| Default model | gemini-2.5-flash-image | gpt-image-1.5 | flux-2-pro | GPT-Image-1 |
+| Default model | gemini-2.5-flash-image | gpt-image-2 | flux-2-pro | GPT-Image-1 |
 | System prompts | Yes | No | No | No |
 | Temperature control | Yes | No | No | No |
-| Resolution control | Pro models | No | Yes | Model-dependent |
+| Resolution control | Pro models | gpt-image-2 only | Yes | Model-dependent |
 | Quality control | No | Yes | No | Yes |
 | Max images per request | 4 | 10 | 10 | 10 |
 | Max reference images | N/A | N/A | 8 | N/A |

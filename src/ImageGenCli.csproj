@@ -11,7 +11,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>image-gen</ToolCommandName>
     <PackageId>ImageGenCli</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <Description>Multi-provider image generation CLI supporting Gemini, OpenAI, BFL FLUX, and Poe</Description>
     <Authors>image-gen-cli contributors</Authors>
     <PackageReadmeFile>README.md</PackageReadmeFile>

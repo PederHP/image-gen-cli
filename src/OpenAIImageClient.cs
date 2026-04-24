@@ -7,7 +7,7 @@ namespace ImageGenCli;
 
 /// <summary>
 /// Image generation client for OpenAI API.
-/// Supports gpt-image-1.5 and gpt-image-1 models.
+/// Supports gpt-image-2, gpt-image-1.5, gpt-image-1, and gpt-image-1-mini models.
 /// </summary>
 public class OpenAIImageClient : IImageGenerationClient
 {
@@ -20,8 +20,8 @@ public class OpenAIImageClient : IImageGenerationClient
     /// Creates a new OpenAI image client.
     /// </summary>
     /// <param name="apiKey">The OpenAI API key.</param>
-    /// <param name="model">The model to use (default: gpt-image-1.5).</param>
-    public OpenAIImageClient(string apiKey, string model = "gpt-image-1.5")
+    /// <param name="model">The model to use (default: gpt-image-2).</param>
+    public OpenAIImageClient(string apiKey, string model = "gpt-image-2")
     {
         _apiKey = apiKey;
         _model = model;
@@ -54,7 +54,7 @@ public class OpenAIImageClient : IImageGenerationClient
             ["model"] = _model,
             ["prompt"] = request.Prompt,
             ["n"] = request.NumberOfImages,
-            ["size"] = MapSize(request.AspectRatio)
+            ["size"] = ResolveSize(request)
         };
 
         if (!string.IsNullOrEmpty(request.Quality))
@@ -85,7 +85,7 @@ public class OpenAIImageClient : IImageGenerationClient
         form.Add(new StringContent(_model), "model");
         form.Add(new StringContent(request.Prompt), "prompt");
         form.Add(new StringContent(request.NumberOfImages.ToString()), "n");
-        form.Add(new StringContent(MapSize(request.AspectRatio)), "size");
+        form.Add(new StringContent(ResolveSize(request)), "size");
 
         if (!string.IsNullOrEmpty(request.Quality))
         {
@@ -141,6 +141,18 @@ public class OpenAIImageClient : IImageGenerationClient
         return result;
     }
 
+    private string ResolveSize(GenerationRequest request)
+    {
+        if (_model == "gpt-image-2" && !string.IsNullOrEmpty(request.Resolution) && request.Resolution != "1K")
+        {
+            if (TryResolveSize(request.Resolution, out var size, out _))
+            {
+                return size;
+            }
+        }
+        return MapSize(request.AspectRatio);
+    }
+
     private static string MapSize(string aspectRatio)
     {
         // OpenAI uses pixel dimensions, map from aspect ratio
@@ -153,5 +165,72 @@ public class OpenAIImageClient : IImageGenerationClient
             "4:3" => "1536x1024",
             _ => "1024x1024"
         };
+    }
+
+    /// <summary>
+    /// Resolves a --resolution value for gpt-image-2, accepting either WxH (e.g. "2048x1152")
+    /// or an aspect ratio (e.g. "3:2"). Validates gpt-image-2 constraints client-side:
+    /// each edge a multiple of 16, max edge ≤ 3840, long:short ratio ≤ 3:1,
+    /// total pixels in [655,360, 8,294,400].
+    /// </summary>
+    public static bool TryResolveSize(string input, out string size, out string error)
+    {
+        size = "";
+        error = "";
+
+        // Aspect-ratio form → pick a sensible preset.
+        if (input.Contains(':') && !input.Contains('x', StringComparison.OrdinalIgnoreCase))
+        {
+            size = input switch
+            {
+                "1:1" => "2048x2048",
+                "3:2" or "16:9" => "2048x1152",
+                "2:3" or "9:16" => "1152x2048",
+                "4:3" => "2048x1536",
+                "3:4" => "1536x2048",
+                _ => ""
+            };
+            if (size == "")
+            {
+                error = $"Unsupported aspect ratio '{input}' for gpt-image-2 --resolution. Try WxH (e.g. 2048x1152) or 1:1, 3:2, 2:3, 16:9, 9:16, 4:3, 3:4.";
+                return false;
+            }
+            return true;
+        }
+
+        // WxH form.
+        var parts = input.ToLowerInvariant().Split('x');
+        if (parts.Length != 2 || !int.TryParse(parts[0], out var w) || !int.TryParse(parts[1], out var h))
+        {
+            error = $"Invalid --resolution '{input}'. Expected WxH (e.g. 2048x1152) or aspect ratio (e.g. 3:2).";
+            return false;
+        }
+
+        if (w % 16 != 0 || h % 16 != 0)
+        {
+            error = $"gpt-image-2 requires both dimensions be multiples of 16 (got {w}x{h}).";
+            return false;
+        }
+        if (w > 3840 || h > 3840)
+        {
+            error = $"gpt-image-2 max edge length is 3840px (got {w}x{h}).";
+            return false;
+        }
+        var longEdge = Math.Max(w, h);
+        var shortEdge = Math.Min(w, h);
+        if (longEdge > shortEdge * 3)
+        {
+            error = $"gpt-image-2 long:short edge ratio must not exceed 3:1 (got {w}x{h}).";
+            return false;
+        }
+        long pixels = (long)w * h;
+        if (pixels < 655_360 || pixels > 8_294_400)
+        {
+            error = $"gpt-image-2 total pixels must be between 655,360 and 8,294,400 (got {pixels:N0} from {w}x{h}).";
+            return false;
+        }
+
+        size = $"{w}x{h}";
+        return true;
     }
 }
