@@ -15,14 +15,51 @@ A multi-provider image generation CLI supporting Google Gemini, OpenAI, BFL FLUX
 
 **Requirements:** .NET 10.0 SDK
 
-### Install as Global Tool (Recommended)
+### Install from NuGet (Recommended)
+
+Once .NET 10 is installed, simply:
 
 ```bash
-# Clone the repository
+dotnet tool install --global ImageGenCli
+```
+
+Update later with `dotnet tool update --global ImageGenCli`.
+
+### Install on a fresh Linux box
+
+If the machine has no .NET, use Microsoft's install script (works without root):
+
+```bash
+curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+chmod +x /tmp/dotnet-install.sh
+/tmp/dotnet-install.sh --channel 10.0
+
+# Persist for future shells
+cat >> ~/.bashrc <<'EOF'
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$PATH"
+EOF
+source ~/.bashrc
+
+dotnet tool install --global ImageGenCli
+```
+
+**Make `image-gen` available to non-interactive shells** (SSH one-shot commands, AI agents, cron, etc.) — `~/.bashrc` is skipped by non-interactive shells, so install a system wrapper:
+
+```bash
+sudo tee /usr/local/bin/image-gen >/dev/null <<EOF
+#!/bin/sh
+export DOTNET_ROOT="$HOME/.dotnet"
+exec "$HOME/.dotnet/tools/image-gen" "\$@"
+EOF
+sudo chmod +x /usr/local/bin/image-gen
+```
+
+### Build from source
+
+```bash
 git clone https://github.com/PederHP/image-gen-cli.git
 cd image-gen-cli
-
-# Build and install
 dotnet pack src/ImageGenCli.csproj -c Release -o ./nupkg
 dotnet tool install --global --add-source ./nupkg ImageGenCli
 ```
@@ -34,7 +71,7 @@ Or use the install script:
 ./image-gen/scripts/install.ps1     # Windows PowerShell
 ```
 
-### Run from Source
+### Run from source without installing
 
 ```bash
 dotnet run --project src/ImageGenCli.csproj -- "Your prompt here"
